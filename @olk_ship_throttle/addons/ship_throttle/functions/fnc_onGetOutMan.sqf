@@ -3,8 +3,13 @@
  * Ship Throttle - fnc_onGetOutMan
  *
  * Called when the local player stops being a Ship's driver (got out,
- * changed seat, or died). Releases cruise control, zeroes the stored
- * throttle, stops the watch loop, and hides the HUD.
+ * changed seat, or died) - either from the watch loop noticing it, or
+ * directly from the GetOutMan/Killed EventHandler dispatchers.
+ * Idempotent: the "olk_watching" flag makes a second call a no-op, so
+ * it's safe for both paths to call this on the same ship.
+ *
+ * Releases cruise control, zeroes the stored throttle, and hides the
+ * HUD.
  *
  * Arguments:
  * 0: Ship <OBJECT>
@@ -18,12 +23,8 @@
 params ["_ship"];
 
 if (isNull _ship) exitWith {};
-
-private _handle = _ship getVariable ["olk_watchHandle", -1];
-if (_handle != -1) then {
-    [_handle] call CBA_fnc_removePerFrameHandler;
-    _ship setVariable ["olk_watchHandle", -1];
-};
+if !(_ship getVariable ["olk_watching", false]) exitWith {};
+_ship setVariable ["olk_watching", false];
 
 if (alive _ship) then {
     _ship setCruiseControl [0, false];

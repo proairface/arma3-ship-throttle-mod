@@ -31,7 +31,11 @@ if (_pct == 0) then {
     // alternative (setCruiseControl [0, true]).
     _ship setCruiseControl [0, false];
 } else {
-    private _reverseViaCruiseControl = missionNamespace getVariable ["olk_ship_throttle_reverseViaCruiseControl", true];
+    // No CBA settings UI in the zero-dependency build - toggle this from
+    // the debug console instead:
+    //   profileNamespace setVariable ["olk_ship_throttle_reverseViaCruiseControl", false];
+    //   saveProfileNamespace;
+    private _reverseViaCruiseControl = profileNamespace getVariable ["olk_ship_throttle_reverseViaCruiseControl", true];
 
     if (_pct < 0 && {!_reverseViaCruiseControl}) then {
         // Fallback reverse mode: release control and let the player back

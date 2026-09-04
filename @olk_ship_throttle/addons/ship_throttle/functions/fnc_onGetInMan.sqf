@@ -4,7 +4,8 @@
  *
  * Called when the local player becomes a Ship's driver. Resets the
  * throttle to a clean 0%, shows the throttle HUD, and starts a
- * low-frequency watch loop that:
+ * low-frequency watch loop (a scheduled `spawn` + `sleep`, the vanilla
+ * equivalent of a per-frame handler) that:
  *  - detects the player leaving the driver seat (seat change, exiting,
  *    death) and hands off to fnc_onGetOutMan;
  *  - detects the vehicle's native brake/S input silently cancelling
@@ -29,37 +30,30 @@
 params ["_ship"];
 
 if (isNull _ship) exitWith {};
-if (_ship getVariable ["olk_watchHandle", -1] != -1) exitWith {};
+if (_ship getVariable ["olk_watching", false]) exitWith {};
+_ship setVariable ["olk_watching", true];
 
 [_ship, 0] call olk_fnc_setThrottle;
 
 "olk_ship_throttle" cutRsc ["olk_ship_throttle_hud", "PLAIN"];
 
-private _handle = [{
+[_ship] spawn {
     params ["_ship"];
 
-    if (isNull _ship || {!alive _ship} || {vehicle player != _ship} || {driver _ship != player}) exitWith {
+    while {
+        !isNull _ship && {alive _ship} && {vehicle player == _ship} && {driver _ship == player}
+    } do {
+        private _pct = _ship getVariable ["olk_throttlePct", 0];
+        if (_pct != 0) then {
+            (getCruiseControl _ship) params ["", "_autoThrust"];
+            if (!_autoThrust) then {
+                [_ship, 0] call olk_fnc_setThrottle;
+            };
+        };
+        sleep 0.5;
+    };
+
+    if (!isNull _ship) then {
         [_ship] call olk_fnc_onGetOutMan;
     };
-
-    private _pct = _ship getVariable ["olk_throttlePct", 0];
-    if (_pct != 0) then {
-        (getCruiseControl _ship) params ["", "_autoThrust"];
-        if (!_autoThrust) then {
-            [_ship, 0] call olk_fnc_setThrottle;
-        };
-    };
-}, 0.5, _ship] call CBA_fnc_addPerFrameHandler;
-
-_ship setVariable ["olk_watchHandle", _handle];
-
-if (isNil {player getVariable "olk_killedHandlerSet"}) then {
-    player addEventHandler ["Killed", {
-        params ["_unit"];
-        private _veh = vehicle _unit;
-        if (_veh isKindOf "Ship") then {
-            [_veh] call olk_fnc_onGetOutMan;
-        };
-    }];
-    player setVariable ["olk_killedHandlerSet", true];
 };

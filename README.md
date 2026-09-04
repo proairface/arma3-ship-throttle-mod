@@ -7,23 +7,30 @@ percentage**: tap a key to step the throttle up or down, the boat
 accelerates/holds that speed on its own, and a small HUD readout in the
 bottom-right shows the current throttle %.
 
+**Zero dependencies** - no CBA_A3 required. (Earlier builds used CBA for
+keybinding/settings/events; that was dropped after a persistent "requires
+addon CBA_A3" error in testing that didn't resolve even with CBA_A3
+installed and enabled - rather than keep debugging someone else's addon
+setup, the mod now only relies on vanilla Arma 3 mechanisms. See
+[Design decisions](#design-decisions) for what replaced what, and the
+tradeoff this brings back: no in-game rebind menu.)
+
 > ⚠️ **Status: untested against a live game.** This addon was built and
 > documented in a sandboxed environment with no access to Arma 3 itself.
-> Every scripting API used below was checked against CBA_A3's own source
-> and (where reachable) the Bohemia Interactive Community wiki. The
-> packed `.pbo` has been verified byte-for-byte (headers, the embedded
-> `prefix`/`author` properties, every file's size, and the trailing
-> SHA1 checksum all round-trip correctly through an independent reader),
-> so the *file format* is sound - but nothing here has actually been
-> loaded and driven in-game. Treat it as "should work" rather than
-> "confirmed working," and go through
-> [Testing checklist](#testing-checklist) before relying on it.
+> Every scripting API used below was checked against the Bohemia
+> Interactive Community wiki (where reachable) or Arma's own documented
+> config mechanisms - not against a live client. The packed `.pbo` has
+> been verified byte-for-byte (headers, the embedded `prefix`/`author`
+> properties, every file's size, and the trailing SHA1 checksum all
+> round-trip correctly through an independent reader), so the *file
+> format* is sound - but the *behavior* hasn't been driven in-game yet.
+> Treat it as "should work" rather than "confirmed working," and go
+> through [Testing checklist](#testing-checklist) before relying on it.
 
 ## Requirements
 
 - Arma 3 **v2.06+** (for `setCruiseControl`)
-- [CBA_A3](https://github.com/CBATeam/CBA_A3) (for keybinding, settings,
-  and player-vehicle-change events)
+- Nothing else. No CBA_A3, no other addons.
 
 ## Installation
 
@@ -32,7 +39,8 @@ bottom-right shows the current throttle %.
 2. Drop the whole `@olk_ship_throttle` folder next to your other Arma 3
    mod folders (e.g. in your Arma 3 installation directory, or wherever
    you keep workshop/manually-installed mods).
-3. Enable both `@CBA_A3` and `@olk_ship_throttle` in the Arma 3 launcher.
+3. Enable `@olk_ship_throttle` in the Arma 3 launcher. That's it - no
+   other mod needs to be active alongside it.
 
 ## Building
 
@@ -63,16 +71,20 @@ and have it output `ship_throttle.pbo` into `@olk_ship_throttle/addons/`.
 
 ## Keybinds
 
-All keybinds are **unbound by default** (per the original brief - don't
-hardcode over a player's existing keys). Bind them yourself in
-**Arma 3 Options → Controls → Configure Addons → Ship Throttle**:
+Without CBA there's no "Configure Addons" rebind menu, so the keys are
+**hardcoded** (in `functions/fnc_keyDown.sqf`):
 
-| Action | Default step |
+| Action | Key |
 |---|---|
-| Increase Ship Throttle | +10% |
-| Decrease Ship Throttle | -10% |
-| Increase Ship Throttle, fine | +1% |
-| Decrease Ship Throttle, fine | -1% |
+| Throttle +10% | Numpad + |
+| Throttle -10% | Numpad - |
+| Throttle +1% | Shift + Numpad + |
+| Throttle -1% | Shift + Numpad - |
+
+To use different keys: edit the `DIK_*` constants compared against in
+`functions/fnc_keyDown.sqf` (see
+[`dikCodes.h`](https://github.com/CBATeam/CBA_A3) or the BI wiki's DIK
+code table for the full list) and repack.
 
 Keys only do anything while you're in the driver seat of a `Ship`.
 
@@ -80,37 +92,52 @@ Keys only do anything while you're in the driver seat of a `Ship`.
 
 Answers to the brief's open questions, and choices made while building:
 
-- **CBA_A3 dependency**: accepted. Keeps keybinding, settings, and
-  vehicle-change detection simple and standard.
+- **CBA_A3 dependency**: initially accepted, then **removed**. A
+  from-Workshop CBA_A3 install, checked and active in the launcher,
+  still produced a persistent "Addon 'olk_ship_throttle' requires addon
+  'CBA_A3'" error that didn't resolve through the usual fixes (launch
+  method, duplicate-install check). Rather than keep chasing an
+  unreproducible environment issue, the addon was rebuilt on vanilla
+  Arma 3 mechanisms only - see the replacements below.
 - **Reverse handling**: **negative throttle** (-100% to 100%), rather
   than relying only on the native S/reverse key. See
   [Known risks](#known-risks--unverified-assumptions) below - this is
-  the least-verified part of the mod, and there's a settings toggle to
-  fall back to native-reverse if it doesn't pan out.
-- **Throttle step size**: 10% per tap, with a Shift-free "fine" pair of
-  keybinds for ±1% (bound separately, not a modifier key, to avoid
-  fighting CBA's own modifier handling on hold-vs-tap keybinds).
+  the least-verified part of the mod, and there's a `profileNamespace`
+  toggle to fall back to native-reverse if it doesn't pan out (see
+  [Keybinds](#keybinds) note and `fnc_setThrottle.sqf`).
+- **Throttle step size**: 10% per tap, with Shift held for ±1% fine
+  control.
 - **HUD style**: simple structured-text overlay (`"<pct>% ⚙"` /
   `"REV <pct>%"`), bottom-right, shown only while driving a `Ship`. No
   custom art/dialog work - matches the brief's "happy with a simple
-  text+icon overlay" fallback option.
+  text+icon overlay" fallback option. Pure vanilla `cutRsc`/`RscTitles` -
+  never depended on CBA.
 - **Idle (0%) behavior**: fully **releases** cruise control
   (`setCruiseControl [0, false]`) rather than actively holding station at
   0 speed (`setCruiseControl [0, true]`). At 0% the hull coasts/drifts
   like a real idling boat, rather than fighting waves/current to stay
   pinned in place. If that feels wrong in testing, swap the branch in
   `functions/fnc_setThrottle.sqf`.
-- **Vehicle-enter/exit detection**: uses CBA's `"vehicle"` player event
-  (`CBA_fnc_addPlayerEventHandler`), **not** `"GetInMan"`/`"GetOutMan"` as
-  the original brief suggested - those aren't real CBA player event
-  names (verified against CBA_A3's current source and wiki; the actual
-  event list is `unit`, `weapon`, `turretWeapon`, `muzzle`, `weaponMode`,
-  `loadout`, `vehicle`, `turret`, `featureCamera`, `cameraView`,
-  `visionMode`, `visibleMap`, `group`, `leader`). `"vehicle"` fires
-  whenever the player's occupied vehicle changes and covers both getting
-  in and out; a driver-to-gunner seat switch within the *same* vehicle
-  doesn't fire it, so that case is instead caught by a 0.5s watch loop
-  (see below).
+- **Vehicle-enter/exit detection**: vanilla config-level `GetInMan` /
+  `GetOutMan` / `Killed` EventHandlers declared on `CAManBase` in
+  `config.cpp` (fires for every unit; each dispatcher function in
+  `functions/fnc_on*EH.sqf` filters down to "this is the local player").
+  These are genuine native Arma 3 unit EventHandlers, confirmed on the
+  BI wiki (`GetOutMan`'s documented signature is
+  `[unit, role, vehicle, turret, isEject]`) - **not** CBA player events.
+  An earlier build used CBA's `"vehicle"` player event and, before that,
+  the brief's proposed `"GetInMan"`/`"GetOutMan"` as if they were CBA
+  event names; they aren't (CBA's real player-event list is `unit`,
+  `weapon`, `turretWeapon`, `muzzle`, `weaponMode`, `loadout`, `vehicle`,
+  `turret`, `featureCamera`, `cameraView`, `visionMode`, `visibleMap`,
+  `group`, `leader`) - the *vanilla* engine-level `GetInMan`/`GetOutMan`
+  EventHandlers the brief was actually thinking of are real, just not
+  reachable through CBA's player-event wrapper.
+- **Init/keybind registration without CBA XEH**: a `CfgFunctions` entry
+  with `postInit = 1` (a vanilla mechanism, not CBA-specific) runs once
+  at mission start and registers a `displayAddEventHandler ["KeyDown", ...]`
+  handler on `findDisplay 46` - the standard pre-CBA technique for a
+  global hotkey.
 
 ## Known risks / unverified assumptions
 
@@ -123,11 +150,17 @@ Carried over from the original brief, plus what this build added:
   inconclusive (one summary suggested a negative value might just
   prevent forward movement rather than reverse it - unconfirmed either
   way). **Test this first** (see checklist below). If it doesn't work as
-  hoped, flip the `olk_ship_throttle_reverseViaCruiseControl` CBA
-  setting off (Arma 3 Options → General → Configure Addons → Ship
-  Throttle) - reverse throttle then just releases cruise control and
-  expects the player to back up with the native S key, same as the
-  brief's non-negative-throttle alternative.
+  hoped, run `profileNamespace setVariable ["olk_ship_throttle_reverseViaCruiseControl", false]; saveProfileNamespace;`
+  in the debug console - reverse throttle then just releases cruise
+  control and expects the player to back up with the native S key, same
+  as the brief's non-negative-throttle alternative.
+- ⚠️ **ASSUMPTION - `GetInMan`'s argument order.** Assumed to mirror the
+  BI wiki's documented `GetOutMan` order (`unit, role, vehicle, turret`)
+  since `GetInMan` itself wasn't directly documented in what was
+  reachable during research. If the HUD never appears when entering a
+  boat, this is the first thing to check (add a `diag_log` or `hint` at
+  the top of `fnc_onGetInManEH.sqf` to see what arguments actually
+  arrive).
 - ⚠️ **ASSUMPTION - `maxSpeed` as the 100% ceiling.** Throttle % maps to
   target speed via `(pct / 100) * maxSpeed` from the vehicle's
   `CfgVehicles` config. `maxSpeed` is a standard AI-driving attribute,
@@ -153,15 +186,15 @@ Carried over from the original brief, plus what this build added:
 
 1. Enter a vanilla RHIB as driver; confirm the throttle HUD appears at
    0% and the hull coasts/drifts rather than being held rigidly in
-   place.
-2. Increase throttle to 50%; confirm the boat accelerates on its own
-   without holding W, and roughly holds a mid-range speed.
+   place. (This alone confirms the `GetInMan` assumption above holds.)
+2. Increase throttle to 50% (Numpad +); confirm the boat accelerates on
+   its own without holding W, and roughly holds a mid-range speed.
 3. Increase to 100%; compare against the boat's known/observed top speed
    to sanity-check the `maxSpeed` assumption.
-4. **Decrease throttle below 0% (reverse).** This is the biggest unknown
-   in the mod - confirm the boat actually backs up. If it doesn't (or
-   behaves oddly, e.g. refuses to move forward again afterwards), turn
-   off "Reverse via setCruiseControl" in the addon's CBA settings and
+4. **Decrease throttle below 0% (reverse, Numpad -).** This is the
+   biggest unknown in the mod - confirm the boat actually backs up. If
+   it doesn't (or behaves oddly, e.g. refuses to move forward again
+   afterwards), set the `profileNamespace` toggle mentioned above and
    re-test - reverse should then just release cruise control and expect
    native S input.
 5. Tap S (brake); confirm cruise control disengages and the HUD/throttle
@@ -169,8 +202,9 @@ Carried over from the original brief, plus what this build added:
 6. Exit the vehicle mid-throttle, re-enter as driver; confirm it comes
    back in a clean 0% state rather than resuming the old value.
 7. Switch from driver to a gunner/cargo seat *without* exiting the
-   vehicle; confirm the HUD hides and cruise control releases within
-   ~0.5s (the watch-loop interval).
+   vehicle; confirm the HUD hides and cruise control releases (should be
+   immediate via `GetOutMan`, or within ~0.5s via the watch loop as a
+   fallback).
 8. Repeat steps 1-4 on a second, differently-sized boat class to catch
    per-class `maxSpeed` weirdness.
 9. Basic MP test (2 clients, ideally a dedicated server) to confirm no
@@ -184,12 +218,15 @@ Carried over from the original brief, plus what this build added:
 └── addons/
     └── ship_throttle/
         ├── $PBOPREFIX$
-        ├── config.cpp
-        ├── XEH_preInit.sqf     - registers the CBA reverse-mode setting
-        ├── XEH_postInit.sqf    - registers the "vehicle" event + keybinds
+        ├── config.cpp          - CfgFunctions, CAManBase EventHandlers, RscTitles include
         ├── functions/
+        │   ├── fnc_init.sqf            - postInit=1, registers the KeyDown handler
+        │   ├── fnc_keyDown.sqf         - hardcoded keybinds -> fnc_adjustThrottle
         │   ├── fnc_setThrottle.sqf     - drives setCruiseControl
-        │   ├── fnc_adjustThrottle.sqf  - +/- delta from a keybind
+        │   ├── fnc_adjustThrottle.sqf  - +/- delta from a keypress
+        │   ├── fnc_onGetInManEH.sqf    - GetInMan EH dispatcher (filters to local player)
+        │   ├── fnc_onGetOutManEH.sqf   - GetOutMan EH dispatcher
+        │   ├── fnc_onKilledEH.sqf      - Killed EH dispatcher
         │   ├── fnc_onGetInMan.sqf      - init state, show HUD, start watch loop
         │   ├── fnc_onGetOutMan.sqf     - release control, hide HUD
         │   └── fnc_updateHud.sqf       - repaint the HUD text

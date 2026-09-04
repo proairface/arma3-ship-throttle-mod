@@ -8,8 +8,8 @@ class CfgPatches
         requiredAddons[] = {};
         author = "Olaf";
         authors[] = {"Olaf"};
-        version = "0.2.0";
-        versionStr = "0.2.0";
+        version = "0.2.1";
+        versionStr = "0.2.1";
     };
 };
 
@@ -40,6 +40,17 @@ class CfgFunctions
 // vanilla (no-CBA) equivalent of a player-vehicle-change hook: it fires
 // automatically for every mission, every respawn, without needing any
 // runtime re-registration.
+//
+// IMPORTANT: the property names below (getInMan/getOutMan/killed) must
+// be the *exact* recognized event names - vanilla config EventHandlers
+// dispatch by that literal name, not by an arbitrary/addon-prefixed key.
+// An earlier build used custom-prefixed names (olk_ship_throttle_*)
+// thinking that made them collision-safe like CBA's XEH; the engine
+// never recognized those as event handlers at all, so nothing fired.
+// The real tradeoff this brings back: without XEH, only ONE handler per
+// event name is allowed on a given class - if another non-CBA addon
+// also defines getInMan/getOutMan/killed on CAManBase, whichever addon
+// loads last silently wins. Not an issue with just this addon active.
 class CfgVehicles
 {
     class Man;
@@ -48,9 +59,9 @@ class CfgVehicles
     {
         class EventHandlers
         {
-            olk_ship_throttle_getInMan = "_this call olk_fnc_onGetInManEH";
-            olk_ship_throttle_getOutMan = "_this call olk_fnc_onGetOutManEH";
-            olk_ship_throttle_killed = "_this call olk_fnc_onKilledEH";
+            getInMan = "_this call olk_fnc_onGetInManEH";
+            getOutMan = "_this call olk_fnc_onGetOutManEH";
+            killed = "_this call olk_fnc_onKilledEH";
         };
     };
 };

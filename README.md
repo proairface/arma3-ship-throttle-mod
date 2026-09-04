@@ -137,7 +137,18 @@ Answers to the brief's open questions, and choices made while building:
   with `postInit = 1` (a vanilla mechanism, not CBA-specific) runs once
   at mission start and registers a `displayAddEventHandler ["KeyDown", ...]`
   handler on `findDisplay 46` - the standard pre-CBA technique for a
-  global hotkey.
+  global hotkey. It runs inside its own `spawn` scope rather than
+  directly in postInit, since postInit's environment is scheduled but
+  reportedly close to blocking (BI forums note a `waitUntil` placed
+  directly in postInit can stall mission loading in some cases) -
+  spawning first means postInit itself returns immediately either way.
+- **Entry-detection watchdog (defense-in-depth)**: `fnc_init.sqf` also
+  spawns a 1s polling loop that starts throttle tracking the moment it
+  finds the local player driving a Ship, independent of whether the
+  `getInMan` EventHandler fired. This exists because of a real bug this
+  project shipped once already (see the note below) - it means a similar
+  future mistake fails soft (control starts up to ~1s late) instead of
+  silently doing nothing.
 
 ## Known risks / unverified assumptions
 
@@ -154,13 +165,30 @@ Carried over from the original brief, plus what this build added:
   in the debug console - reverse throttle then just releases cruise
   control and expects the player to back up with the native S key, same
   as the brief's non-negative-throttle alternative.
+- 🐛 **FIXED (was a real bug, not just a risk) - config EventHandlers
+  need the exact literal event name.** The first zero-dependency build
+  registered `class EventHandlers { olk_ship_throttle_getInMan = "..."; }`
+  on `CAManBase`, thinking an addon-prefixed name kept it collision-safe
+  the way CBA's XEH does. It doesn't: vanilla config EventHandlers
+  dispatch strictly by the literal recognized name (`getInMan`,
+  `getOutMan`, `killed`, ...) - an unrecognized property name is just an
+  inert config value, never fires, and produces no error. That's why the
+  mod loaded clean but did nothing at all. Fixed by using the literal
+  names. The real tradeoff this brings back: without XEH, only one
+  handler per event name is allowed per class - if you ever add another
+  non-CBA addon that also defines `getInMan`/`getOutMan`/`killed` on
+  `CAManBase`, whichever loads last silently wins.
 - ⚠️ **ASSUMPTION - `GetInMan`'s argument order.** Assumed to mirror the
   BI wiki's documented `GetOutMan` order (`unit, role, vehicle, turret`)
   since `GetInMan` itself wasn't directly documented in what was
-  reachable during research. If the HUD never appears when entering a
-  boat, this is the first thing to check (add a `diag_log` or `hint` at
+  reachable during research. `fnc_onGetInManEH.sqf` only trusts `_unit`
+  and `_vehicle` from this (verifying the driver seat directly via the
+  `driver` command rather than the reported role string), and the
+  postInit watchdog above is an independent fallback in case this
+  argument order - or anything else about this specific handler - turns
+  out to be wrong. If the HUD still never appears, add a `diag_log` at
   the top of `fnc_onGetInManEH.sqf` to see what arguments actually
-  arrive).
+  arrive.
 - ⚠️ **ASSUMPTION - `maxSpeed` as the 100% ceiling.** Throttle % maps to
   target speed via `(pct / 100) * maxSpeed` from the vehicle's
   `CfgVehicles` config. `maxSpeed` is a standard AI-driving attribute,

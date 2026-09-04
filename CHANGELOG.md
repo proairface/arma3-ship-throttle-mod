@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.2.1 - fix: config EventHandlers never actually fired
+
+- **Bug fix**: 0.2.0's `config.cpp` registered the `getInMan`/`getOutMan`/
+  `killed` EventHandlers on `CAManBase` under addon-prefixed property
+  names (e.g. `olk_ship_throttle_getInMan`), thinking that made them
+  collision-safe. Vanilla config EventHandlers dispatch strictly by the
+  literal recognized name - an unrecognized property name is inert and
+  never fires, with no error. This is why the mod loaded without errors
+  but never actually did anything (reported by real-world testing).
+  Fixed by using the literal `getInMan`/`getOutMan`/`killed` names.
+- Added a 1s postInit watchdog (`fnc_init.sqf`) that starts throttle
+  tracking as soon as the local player is found driving a Ship,
+  independent of whether the EventHandlers above fire - defense in
+  depth against a repeat of the same class of bug.
+- Hardened `fnc_onGetInManEH.sqf` to verify the driver seat via the
+  `driver` command directly rather than trusting `GetInMan`'s reported
+  role string, since that argument order is still an unconfirmed
+  assumption (see README "Known risks").
+- Moved keybind registration into its own `spawn` scope inside
+  `fnc_init.sqf` rather than calling `waitUntil` directly in postInit,
+  after finding BI forum reports that postInit's scheduled environment
+  can behave close to blocking.
+
 ## 0.2.0 - remove CBA_A3 dependency
 
 - Removed the CBA_A3 requirement entirely, after a persistent "requires

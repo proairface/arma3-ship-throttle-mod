@@ -177,6 +177,23 @@ Answers to the brief's open questions, and choices made while building:
 
 Carried over from the original brief, plus what this build added:
 
+- 🐛 **FIXED - `CAManBase`'s re-declared parent class was wrong.**
+  `config.cpp` re-opened `CAManBase` as `class CAManBase: Civilian`, but
+  the real base game hierarchy has `CAManBase` inheriting from `Man`
+  directly (confirmed against a real working mod's config:
+  `class Man: Land {...}; class CAManBase: Man {...};` - no `Civilian`
+  in that chain at all). Reopening an existing class with a mismatched
+  parent is a real, documented Arma config problem. It's unclear how
+  much this actually broke in practice (the postInit watchdog fallback
+  may have been masking it), but it was wrong regardless and is now
+  fixed to inherit directly from `Man`, matching the confirmed
+  hierarchy.
+- Removed an unverified GUI `style` constant (`ST_RIGHT`) from
+  `RscTitles.hpp` that I was never able to confirm the numeric value
+  for - the HUD text already gets its right-alignment from an inline
+  `<t align='right'>` tag in `fn_updateHud.sqf`, so the outer `style`
+  property was both unverified and redundant. Removed rather than left
+  guessed.
 - ⚠️ **UNVERIFIED - reverse via negative `setCruiseControl` speed.** The
   BI wiki only documents `setCruiseControl`'s speed parameter for
   positive km/h values; there's no documented negative-speed/reverse

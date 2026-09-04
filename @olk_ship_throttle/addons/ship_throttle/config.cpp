@@ -8,8 +8,8 @@ class CfgPatches
         requiredAddons[] = {};
         author = "Olaf";
         authors[] = {"Olaf"};
-        version = "0.3.2";
-        versionStr = "0.3.2";
+        version = "0.3.3";
+        versionStr = "0.3.3";
     };
 };
 
@@ -52,11 +52,22 @@ class CfgFunctions
 // event name is allowed on a given class - if another non-CBA addon
 // also defines getInMan/getOutMan/killed on CAManBase, whichever addon
 // loads last silently wins. Not an issue with just this addon active.
+//
+// CAManBase's real parent is Man directly (confirmed against a real
+// working mod's config.cpp: `class Man: Land {...}; class CAManBase: Man
+// {...};`) - an earlier build incorrectly re-declared it as
+// `class Civilian: Man {}; class CAManBase: Civilian {...}`, a parent
+// that doesn't match the base game's actual class. Reopening an
+// existing class with a mismatched parent is a real, documented Arma
+// config problem (BI wiki/forums both describe it), so this was a
+// second, independent bug on top of the EventHandlers-naming one above -
+// possibly still masked by the postInit watchdog fallback, but wrong
+// either way. Fixed to inherit directly from Man, matching the
+// confirmed real hierarchy.
 class CfgVehicles
 {
     class Man;
-    class Civilian: Man {};
-    class CAManBase: Civilian
+    class CAManBase: Man
     {
         class EventHandlers
         {

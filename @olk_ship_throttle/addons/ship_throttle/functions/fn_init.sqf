@@ -42,6 +42,12 @@
 systemChat "[ShipThrottle] postInit started";
 
 [] spawn {
+    // TEMPORARY: confirms this spawn scope itself actually started,
+    // distinct from the retry loop below - if this message never shows
+    // up at all, the spawn itself is failing before ever reaching the
+    // loop, which is a different problem than findDisplay 46 being slow.
+    systemChat "[ShipThrottle] keybind-registration spawn entered";
+
     // TEMPORARY: was a plain `waitUntil` before - replaced with a
     // logged, timed retry loop since we never got confirmation this
     // step (message #2 below) was actually being reached at all.

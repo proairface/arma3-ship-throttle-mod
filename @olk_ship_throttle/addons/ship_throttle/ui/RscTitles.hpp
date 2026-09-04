@@ -15,8 +15,10 @@ class RscTitles
             class olk_throttle_text
             {
                 idc = 62100;
-                type = 13; // CT_STRUCTURED_TEXT
-                style = 1; // ST_RIGHT
+                type = 13; // CT_STRUCTURED_TEXT (confirmed on BI wiki)
+                // No `style` constant here - alignment is set inline via
+                // the <t align='right'> tag in fn_updateHud.sqf's text
+                // instead, avoiding an unverified ST_* numeric guess.
                 x = "safezoneX + safezoneW - 0.16";
                 y = "safezoneY + safezoneH - 0.06";
                 w = 0.14;

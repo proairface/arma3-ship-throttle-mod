@@ -10,9 +10,13 @@ bottom-right shows the current throttle %.
 > ⚠️ **Status: untested against a live game.** This addon was built and
 > documented in a sandboxed environment with no access to Arma 3 itself.
 > Every scripting API used below was checked against CBA_A3's own source
-> and (where reachable) the Bohemia Interactive Community wiki, but
-> nothing here has been run in-game. Treat it as "should work" rather
-> than "confirmed working," and go through
+> and (where reachable) the Bohemia Interactive Community wiki. The
+> packed `.pbo` has been verified byte-for-byte (headers, the embedded
+> `prefix`/`author` properties, every file's size, and the trailing
+> SHA1 checksum all round-trip correctly through an independent reader),
+> so the *file format* is sound - but nothing here has actually been
+> loaded and driven in-game. Treat it as "should work" rather than
+> "confirmed working," and go through
 > [Testing checklist](#testing-checklist) before relying on it.
 
 ## Requirements
@@ -32,17 +36,30 @@ bottom-right shows the current throttle %.
 
 ## Building
 
-This repo ships source only (`config.cpp` + `.sqf`, not a packed
-`.pbo`) - it needs to be built with an Arma 3 PBO tool:
+This repo ships source only (`config.cpp` + `.sqf`), not a packed
+`.pbo` (build artifacts aren't committed - see `.gitignore`). A few ways
+to pack it:
 
-- **[HEMTT](https://github.com/BrettMayson/HEMTT)** (recommended,
-  actively maintained by the community) - run `hemtt build` from the
-  repo root once you've added a `.hemtt/project.toml`; or
+- **`scripts/build-pbo/`** (included in this repo, no Windows/Steam
+  needed - just Node.js):
+  ```bash
+  cd scripts/build-pbo
+  npm install
+  npm run build
+  ```
+  This uses [`gulp-armapbo`](https://www.npmjs.com/package/gulp-armapbo),
+  a pure-JS Arma PBO packer, and writes
+  `@olk_ship_throttle/addons/ship_throttle.pbo`. It also embeds the
+  `prefix` property directly (from `$PBOPREFIX$`'s contents) rather than
+  relying on the loose `$PBOPREFIX$` file at runtime.
+- **[HEMTT](https://github.com/BrettMayson/HEMTT)** (the community's
+  standard Rust-based build tool) - run `hemtt build` from the repo root
+  once you've added a `.hemtt/project.toml`; or
 - **Arma 3 Tools' Addon Builder** (from Steam, under Arma 3 Tools); or
 - **[PBO Manager](http://www.armaholic.com/page.php?id=16369)**.
 
-Point whichever tool at `@olk_ship_throttle/addons/ship_throttle/` and
-have it output `ship_throttle.pbo` into `@olk_ship_throttle/addons/`.
+Whichever tool you use, point it at `@olk_ship_throttle/addons/ship_throttle/`
+and have it output `ship_throttle.pbo` into `@olk_ship_throttle/addons/`.
 
 ## Keybinds
 

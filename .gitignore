@@ -7,6 +7,10 @@
 .hemttout/
 .hemtt/cache/
 
+# Build script deps
+scripts/build-pbo/node_modules/
+scripts/build-pbo/package-lock.json
+
 # OS/editor cruft
 .DS_Store
 Thumbs.db

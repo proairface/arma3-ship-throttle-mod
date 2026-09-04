@@ -1,0 +1,13 @@
+{
+  "name": "build-pbo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Packs @olk_ship_throttle/addons/ship_throttle into ship_throttle.pbo without needing Windows/Arma 3 Tools.",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "dependencies": {
+    "gulp-armapbo": "^2.0.2",
+    "vinyl-fs": "^3.0.3"
+  }
+}

@@ -4,14 +4,27 @@
  * Author: Olaf
  * Ship Throttle - fnc_keyDown
  *
- * Hardcoded default keybinds (no CBA = no in-game rebind UI):
- *   Numpad +        throttle +10%
- *   Numpad -        throttle -10%
- *   Shift+Numpad +  throttle +1%
- *   Shift+Numpad -  throttle -1%
+ * Hijacks W/S while driving a Ship into discrete, jet-style throttle
+ * steps instead of native hold-to-accelerate/brake:
+ *   W          throttle +10%
+ *   S          throttle -10%
+ *   Shift+W    throttle +1%
+ *   Shift+S    throttle -1%
  *
- * To use different keys: change the DIK_* constants compared against
- * below (see dikCodes.h for the full list) and repack the addon.
+ * Returning true consumes the key entirely - native analog
+ * accelerate/brake no longer works on a Ship at all once this is
+ * active, by design (it's a full replacement, not a supplement). W/S
+ * behave completely normally in every other context (on foot, other
+ * vehicle types, menus/chat) since _handled is false there.
+ *
+ * Debounces the engine's own key-repeat: `KeyDown` fires repeatedly
+ * while a key is held (like a text field), so a naive implementation
+ * would spam +10%/tap into +10%/frame while W is held. A small
+ * held-keys tracker (cleared on KeyUp - see fn_keyUp.sqf) makes a held
+ * key step exactly once, matching a real jet throttle tap.
+ *
+ * To use different keys: change the DIK_* constants below (see
+ * dikCodes.h for the full list) and repack the addon.
  *
  * Arguments:
  * 0: DIK key code <NUMBER>
@@ -25,14 +38,20 @@
 
 params ["_key", "_shift"];
 
+if (_key != DIK_W && {_key != DIK_S}) exitWith {false};
+
 private _handled = (vehicle player) isKindOf "Ship" && {driver (vehicle player) == player};
 if (!_handled) exitWith {false};
 
-private _delta = 0;
-if (_key == DIK_ADD) then { _delta = if (_shift) then {1} else {10} };
-if (_key == DIK_SUBTRACT) then { _delta = if (_shift) then {-1} else {-10} };
+private _heldKeys = missionNamespace getVariable ["olk_ship_throttle_heldKeys", []];
+if (_key in _heldKeys) exitWith {true}; // auto-repeat while held - already stepped on the initial press
 
-if (_delta == 0) exitWith {false};
+_heldKeys pushBackUnique _key;
+missionNamespace setVariable ["olk_ship_throttle_heldKeys", _heldKeys];
+
+private _delta = 0;
+if (_key == DIK_W) then { _delta = if (_shift) then {1} else {10} };
+if (_key == DIK_S) then { _delta = if (_shift) then {-1} else {-10} };
 
 // TEMPORARY DIAGNOSTIC BREADCRUMB - remove once confirmed working.
 systemChat format ["[ShipThrottle] key handled, delta=%1", _delta];

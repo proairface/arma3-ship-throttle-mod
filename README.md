@@ -71,18 +71,29 @@ and have it output `ship_throttle.pbo` into `@olk_ship_throttle/addons/`.
 
 ## Keybinds
 
+**W and S are fully repurposed into jet-style throttle steps while
+driving a Ship** - not a supplement to native accelerate/brake, a
+replacement. Native hold-to-accelerate/brake no longer works on a boat
+at all once this addon is active; tap W/S to step the set throttle %
+instead, exactly like the brief's jet-throttle reference. W/S behave
+completely normally everywhere else (on foot, cars, aircraft,
+menus/chat).
+
 Without CBA there's no "Configure Addons" rebind menu, so the keys are
 **hardcoded** (in `functions/fn_keyDown.sqf`):
 
 | Action | Key |
 |---|---|
-| Throttle +10% | Numpad + |
-| Throttle -10% | Numpad - |
-| Throttle +1% | Shift + Numpad + |
-| Throttle -1% | Shift + Numpad - |
+| Throttle +10% | W |
+| Throttle -10% | S |
+| Throttle +1% | Shift + W |
+| Throttle -1% | Shift + S |
 
-To use different keys: edit the `DIK_*` constants compared against in
-`functions/fn_keyDown.sqf` (see
+Holding a key steps once (not once per frame) - see "W/S key-repeat
+debounce" below.
+
+To use different keys: edit the `DIK_*` constants in
+`functions/fn_keyDown.sqf` and `fn_keyUp.sqf` (see
 [`dikCodes.h`](https://github.com/CBATeam/CBA_A3) or the BI wiki's DIK
 code table for the full list) and repack.
 
@@ -107,6 +118,18 @@ Answers to the brief's open questions, and choices made while building:
   [Keybinds](#keybinds) note and `fn_setThrottle.sqf`).
 - **Throttle step size**: 10% per tap, with Shift held for ±1% fine
   control.
+- **Keys: W/S, not a dedicated key** (changed after real-world testing).
+  The first build used unbound-by-default dedicated keys (Numpad ±,
+  matching the brief's "don't hardcode over existing keys" instinct);
+  the actual ask turned out to be "make W/S work like a jet throttle."
+  `fn_keyDown.sqf`/`fn_keyUp.sqf` now fully consume W/S while driving a
+  Ship - native hold-to-accelerate/brake stops working entirely on
+  boats, replaced by discrete steps, same as a real jet/plane throttle.
+- **W/S key-repeat debounce**: `KeyDown` fires repeatedly while a key is
+  held (engine-level key-repeat, same as a text field), which would
+  otherwise spam +10%/frame instead of +10%/tap. `fn_keyDown.sqf` tracks
+  currently-held keys (cleared by `fn_keyUp.sqf` on release) so a held
+  key steps exactly once.
 - **HUD style**: simple structured-text overlay (`"<pct>% ⚙"` /
   `"REV <pct>%"`), bottom-right, shown only while driving a `Ship`. No
   custom art/dialog work - matches the brief's "happy with a simple
@@ -195,12 +218,16 @@ Carried over from the original brief, plus what this build added:
   not guaranteed to be an accurate top-speed ceiling for every
   vanilla/modded boat. Test against at least two differently-sized boats
   (checklist item 6).
-- ⚠️ **ASSUMPTION - brake cancels cruise control on boats.** The BI wiki
-  states applying brakes disables Cruise Control, but its only worked
-  example is a car. The watch loop in `fn_onGetInMan.sqf` assumes the
-  same holds for ships and resets the throttle to 0% when it detects
+- ⚠️ **ASSUMPTION (now largely moot) - brake cancels cruise control on
+  boats.** The BI wiki states applying brakes disables Cruise Control,
+  but its only worked example is a car. The watch loop in
+  `fn_onGetInMan.sqf` resets the throttle to 0% if it detects
   `getCruiseControl` silently went to `autoThrust = false` while a
-  nonzero throttle was still stored.
+  nonzero throttle was still stored. Since S is now fully consumed by
+  `fn_keyDown.sqf` instead of reaching the vehicle as a native brake
+  input, the player can no longer trigger this path directly - the
+  check is kept as a defensive fallback for any other way cruise
+  control might get silently disabled (collision, damage, another mod).
 - ⚠️ **UNTESTED - multiplayer locality.** `setCruiseControl` is
   documented as operating on the *local* player's vehicle, so this
   should be inherently per-client with no sync needed - but that's only
@@ -248,8 +275,9 @@ Carried over from the original brief, plus what this build added:
         ├── $PBOPREFIX$
         ├── config.cpp          - CfgFunctions, CAManBase EventHandlers, RscTitles include
         ├── functions/
-        │   ├── fn_init.sqf            - postInit=1, registers the KeyDown handler
-        │   ├── fn_keyDown.sqf         - hardcoded keybinds -> fnc_adjustThrottle
+        │   ├── fn_init.sqf            - postInit=1, registers KeyDown/KeyUp handlers
+        │   ├── fn_keyDown.sqf         - W/S hijack -> adjustThrottle (debounced)
+        │   ├── fn_keyUp.sqf           - clears the key-repeat debounce tracker
         │   ├── fn_setThrottle.sqf     - drives setCruiseControl
         │   ├── fn_adjustThrottle.sqf  - +/- delta from a keypress
         │   ├── fn_onGetInManEH.sqf    - GetInMan EH dispatcher (filters to local player)

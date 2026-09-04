@@ -50,6 +50,11 @@ systemChat "[ShipThrottle] postInit started";
         [_key, _shift] call olk_fnc_keyDown
     }];
 
+    _display displayAddEventHandler ["KeyUp", {
+        params ["_display", "_key"];
+        [_key] call olk_fnc_keyUp
+    }];
+
     systemChat "[ShipThrottle] keybind handler registered";
 };
 

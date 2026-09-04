@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.0 - W/S jet-style throttle instead of a dedicated key
+
+- Confirmed working end to end in real testing (postInit, keybind
+  registration, GetInMan/HUD all fire correctly after the 0.2.3 fix).
+- Changed the control scheme from a dedicated key (Numpad ±) to fully
+  hijacking **W/S** while driving a Ship: tap W/S to step the throttle
+  ±10% (Shift for ±1%), matching a real jet/plane throttle rather than
+  hold-to-accelerate. Native analog accelerate/brake no longer works on
+  boats at all - this is a full replacement. W/S behave normally
+  everywhere else.
+- Added `fn_keyUp.sqf` and a held-keys tracker in `fn_keyDown.sqf` to
+  debounce the engine's key-repeat on `KeyDown` (which fires repeatedly
+  while a key is held) - otherwise holding W would spam +10% every
+  frame instead of stepping once per tap.
+- The "brake cancels cruise control" watch-loop fallback is kept but
+  now largely defensive-only, since S no longer reaches the vehicle as
+  a native brake input at all.
+
 ## 0.2.3 - fix: wrong function file naming convention (the actual root cause)
 
 - **Root-cause bug fix**: every function file in this addon was named

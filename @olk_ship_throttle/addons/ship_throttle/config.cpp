@@ -8,8 +8,8 @@ class CfgPatches
         requiredAddons[] = {};
         author = "Olaf";
         authors[] = {"Olaf"};
-        version = "0.2.3";
-        versionStr = "0.2.3";
+        version = "0.3.0";
+        versionStr = "0.3.0";
     };
 };
 
@@ -22,6 +22,7 @@ class CfgFunctions
             file = "olk_ship_throttle\addons\ship_throttle\functions";
             class init { postInit = 1; };
             class keyDown {};
+            class keyUp {};
             class setThrottle {};
             class adjustThrottle {};
             class onGetInMan {};

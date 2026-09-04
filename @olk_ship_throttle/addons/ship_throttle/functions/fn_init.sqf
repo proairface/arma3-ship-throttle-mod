@@ -42,8 +42,21 @@
 systemChat "[ShipThrottle] postInit started";
 
 [] spawn {
+    // TEMPORARY: was a plain `waitUntil` before - replaced with a
+    // logged, timed retry loop since we never got confirmation this
+    // step (message #2 below) was actually being reached at all.
     private _display = displayNull;
-    waitUntil { !isNull (_display = findDisplay 46) };
+    private _elapsed = 0;
+    while {isNull _display} do {
+        _display = findDisplay 46;
+        if (isNull _display) then {
+            sleep 1;
+            _elapsed = _elapsed + 1;
+            systemChat format ["[ShipThrottle] still waiting for findDisplay 46... %1s elapsed", _elapsed];
+        };
+    };
+
+    systemChat format ["[ShipThrottle] findDisplay 46 found after %1s, registering KeyDown/KeyUp", _elapsed];
 
     _display displayAddEventHandler ["KeyDown", {
         params ["_display", "_key", "_shift"];

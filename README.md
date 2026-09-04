@@ -188,12 +188,19 @@ Carried over from the original brief, plus what this build added:
   may have been masking it), but it was wrong regardless and is now
   fixed to inherit directly from `Man`, matching the confirmed
   hierarchy.
-- Removed an unverified GUI `style` constant (`ST_RIGHT`) from
-  `RscTitles.hpp` that I was never able to confirm the numeric value
-  for - the HUD text already gets its right-alignment from an inline
-  `<t align='right'>` tag in `fn_updateHud.sqf`, so the outer `style`
-  property was both unverified and redundant. Removed rather than left
-  guessed.
+- 🐛 **FIXED (regression I introduced, then fixed) - `style` is a
+  required config entry.** A review pass removed the HUD control's
+  `style` property, reasoning it was an unverified/redundant guess
+  (`ST_RIGHT`) since alignment already comes from an inline
+  `<t align='right'>` tag. That was wrong: `style` turned out to be
+  *required* for this control (confirmed by an in-game
+  `No entry '...olk_throttle_text.style'` error the moment the HUD
+  tried to load) - the lesson being that an unverified *value* and a
+  missing *required field* are different problems, and removing a
+  field entirely is not a safe way to avoid an unverified guess.
+  Restored with `style = 0` (`ST_LEFT`, confirmed on the BI wiki as a
+  safe baseline) - actual right-alignment still comes from the inline
+  tag, independent of this value.
 - ⚠️ **UNVERIFIED - reverse via negative `setCruiseControl` speed.** The
   BI wiki only documents `setCruiseControl`'s speed parameter for
   positive km/h values; there's no documented negative-speed/reverse

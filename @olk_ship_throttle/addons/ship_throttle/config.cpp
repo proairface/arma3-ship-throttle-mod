@@ -8,8 +8,8 @@ class CfgPatches
         requiredAddons[] = {};
         author = "Olaf";
         authors[] = {"Olaf"};
-        version = "0.3.3";
-        versionStr = "0.3.3";
+        version = "0.3.4";
+        versionStr = "0.3.4";
     };
 };
 

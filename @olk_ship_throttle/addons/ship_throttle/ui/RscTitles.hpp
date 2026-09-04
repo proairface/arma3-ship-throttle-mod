@@ -16,9 +16,16 @@ class RscTitles
             {
                 idc = 62100;
                 type = 13; // CT_STRUCTURED_TEXT (confirmed on BI wiki)
-                // No `style` constant here - alignment is set inline via
-                // the <t align='right'> tag in fn_updateHud.sqf's text
-                // instead, avoiding an unverified ST_* numeric guess.
+                // `style` turned out to be a REQUIRED config entry for
+                // this control (confirmed by an in-game "No entry
+                // ...style" error after a previous build omitted it
+                // entirely, thinking it was redundant/unverified - that
+                // was a mistake, removing a required field is worse than
+                // guessing its value). ST_LEFT = 0 is confirmed on the BI
+                // wiki and is a safe baseline; actual right-alignment
+                // still comes from the inline <t align='right'> tag in
+                // fn_updateHud.sqf, independent of this value.
+                style = 0; // ST_LEFT
                 x = "safezoneX + safezoneW - 0.16";
                 y = "safezoneY + safezoneH - 0.06";
                 w = 0.14;

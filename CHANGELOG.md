@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.3 - fix: wrong function file naming convention (the actual root cause)
+
+- **Root-cause bug fix**: every function file in this addon was named
+  `fnc_<Name>.sqf` (e.g. `fnc_setThrottle.sqf`). The real, confirmed
+  (BI wiki + an in-game "Script ... fn_init.sqf not found" error)
+  default `CfgFunctions` naming convention is `fn_<Name>.sqf` - no "c".
+  This means **no function in this addon was ever actually found/run by
+  the engine, in any previous build**, including the 0.2.1/0.2.2
+  EventHandler and watchdog fixes - those were real, correct fixes, but
+  they were themselves living in files the engine could never locate,
+  so none of it ever had a chance to run. Renamed every `functions/fnc_*.sqf`
+  file to `functions/fn_*.sqf`. The callable function names
+  (`olk_fnc_setThrottle` etc.) are unchanged - only the on-disk filenames
+  were wrong.
+- This is a strong root-cause candidate for the whole "loads fine, does
+  nothing" saga across 0.1.0-0.2.2. Rebuilt and re-verified the packed
+  PBO byte-for-byte as before.
+
 ## 0.2.1 - fix: config EventHandlers never actually fired
 
 - **Bug fix**: 0.2.0's `config.cpp` registered the `getInMan`/`getOutMan`/
@@ -10,16 +28,16 @@
   never fires, with no error. This is why the mod loaded without errors
   but never actually did anything (reported by real-world testing).
   Fixed by using the literal `getInMan`/`getOutMan`/`killed` names.
-- Added a 1s postInit watchdog (`fnc_init.sqf`) that starts throttle
+- Added a 1s postInit watchdog (`fn_init.sqf`) that starts throttle
   tracking as soon as the local player is found driving a Ship,
   independent of whether the EventHandlers above fire - defense in
   depth against a repeat of the same class of bug.
-- Hardened `fnc_onGetInManEH.sqf` to verify the driver seat via the
+- Hardened `fn_onGetInManEH.sqf` to verify the driver seat via the
   `driver` command directly rather than trusting `GetInMan`'s reported
   role string, since that argument order is still an unconfirmed
   assumption (see README "Known risks").
 - Moved keybind registration into its own `spawn` scope inside
-  `fnc_init.sqf` rather than calling `waitUntil` directly in postInit,
+  `fn_init.sqf` rather than calling `waitUntil` directly in postInit,
   after finding BI forum reports that postInit's scheduled environment
   can behave close to blocking.
 

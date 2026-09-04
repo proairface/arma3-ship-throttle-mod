@@ -72,7 +72,7 @@ and have it output `ship_throttle.pbo` into `@olk_ship_throttle/addons/`.
 ## Keybinds
 
 Without CBA there's no "Configure Addons" rebind menu, so the keys are
-**hardcoded** (in `functions/fnc_keyDown.sqf`):
+**hardcoded** (in `functions/fn_keyDown.sqf`):
 
 | Action | Key |
 |---|---|
@@ -82,7 +82,7 @@ Without CBA there's no "Configure Addons" rebind menu, so the keys are
 | Throttle -1% | Shift + Numpad - |
 
 To use different keys: edit the `DIK_*` constants compared against in
-`functions/fnc_keyDown.sqf` (see
+`functions/fn_keyDown.sqf` (see
 [`dikCodes.h`](https://github.com/CBATeam/CBA_A3) or the BI wiki's DIK
 code table for the full list) and repack.
 
@@ -104,7 +104,7 @@ Answers to the brief's open questions, and choices made while building:
   [Known risks](#known-risks--unverified-assumptions) below - this is
   the least-verified part of the mod, and there's a `profileNamespace`
   toggle to fall back to native-reverse if it doesn't pan out (see
-  [Keybinds](#keybinds) note and `fnc_setThrottle.sqf`).
+  [Keybinds](#keybinds) note and `fn_setThrottle.sqf`).
 - **Throttle step size**: 10% per tap, with Shift held for ±1% fine
   control.
 - **HUD style**: simple structured-text overlay (`"<pct>% ⚙"` /
@@ -117,11 +117,11 @@ Answers to the brief's open questions, and choices made while building:
   0 speed (`setCruiseControl [0, true]`). At 0% the hull coasts/drifts
   like a real idling boat, rather than fighting waves/current to stay
   pinned in place. If that feels wrong in testing, swap the branch in
-  `functions/fnc_setThrottle.sqf`.
+  `functions/fn_setThrottle.sqf`.
 - **Vehicle-enter/exit detection**: vanilla config-level `GetInMan` /
   `GetOutMan` / `Killed` EventHandlers declared on `CAManBase` in
   `config.cpp` (fires for every unit; each dispatcher function in
-  `functions/fnc_on*EH.sqf` filters down to "this is the local player").
+  `functions/fn_on*EH.sqf` filters down to "this is the local player").
   These are genuine native Arma 3 unit EventHandlers, confirmed on the
   BI wiki (`GetOutMan`'s documented signature is
   `[unit, role, vehicle, turret, isEject]`) - **not** CBA player events.
@@ -142,7 +142,7 @@ Answers to the brief's open questions, and choices made while building:
   reportedly close to blocking (BI forums note a `waitUntil` placed
   directly in postInit can stall mission loading in some cases) -
   spawning first means postInit itself returns immediately either way.
-- **Entry-detection watchdog (defense-in-depth)**: `fnc_init.sqf` also
+- **Entry-detection watchdog (defense-in-depth)**: `fn_init.sqf` also
   spawns a 1s polling loop that starts throttle tracking the moment it
   finds the local player driving a Ship, independent of whether the
   `getInMan` EventHandler fired. This exists because of a real bug this
@@ -181,13 +181,13 @@ Carried over from the original brief, plus what this build added:
 - ⚠️ **ASSUMPTION - `GetInMan`'s argument order.** Assumed to mirror the
   BI wiki's documented `GetOutMan` order (`unit, role, vehicle, turret`)
   since `GetInMan` itself wasn't directly documented in what was
-  reachable during research. `fnc_onGetInManEH.sqf` only trusts `_unit`
+  reachable during research. `fn_onGetInManEH.sqf` only trusts `_unit`
   and `_vehicle` from this (verifying the driver seat directly via the
   `driver` command rather than the reported role string), and the
   postInit watchdog above is an independent fallback in case this
   argument order - or anything else about this specific handler - turns
   out to be wrong. If the HUD still never appears, add a `diag_log` at
-  the top of `fnc_onGetInManEH.sqf` to see what arguments actually
+  the top of `fn_onGetInManEH.sqf` to see what arguments actually
   arrive.
 - ⚠️ **ASSUMPTION - `maxSpeed` as the 100% ceiling.** Throttle % maps to
   target speed via `(pct / 100) * maxSpeed` from the vehicle's
@@ -197,7 +197,7 @@ Carried over from the original brief, plus what this build added:
   (checklist item 6).
 - ⚠️ **ASSUMPTION - brake cancels cruise control on boats.** The BI wiki
   states applying brakes disables Cruise Control, but its only worked
-  example is a car. The watch loop in `fnc_onGetInMan.sqf` assumes the
+  example is a car. The watch loop in `fn_onGetInMan.sqf` assumes the
   same holds for ships and resets the throttle to 0% when it detects
   `getCruiseControl` silently went to `autoThrust = false` while a
   nonzero throttle was still stored.
@@ -248,16 +248,16 @@ Carried over from the original brief, plus what this build added:
         ├── $PBOPREFIX$
         ├── config.cpp          - CfgFunctions, CAManBase EventHandlers, RscTitles include
         ├── functions/
-        │   ├── fnc_init.sqf            - postInit=1, registers the KeyDown handler
-        │   ├── fnc_keyDown.sqf         - hardcoded keybinds -> fnc_adjustThrottle
-        │   ├── fnc_setThrottle.sqf     - drives setCruiseControl
-        │   ├── fnc_adjustThrottle.sqf  - +/- delta from a keypress
-        │   ├── fnc_onGetInManEH.sqf    - GetInMan EH dispatcher (filters to local player)
-        │   ├── fnc_onGetOutManEH.sqf   - GetOutMan EH dispatcher
-        │   ├── fnc_onKilledEH.sqf      - Killed EH dispatcher
-        │   ├── fnc_onGetInMan.sqf      - init state, show HUD, start watch loop
-        │   ├── fnc_onGetOutMan.sqf     - release control, hide HUD
-        │   └── fnc_updateHud.sqf       - repaint the HUD text
+        │   ├── fn_init.sqf            - postInit=1, registers the KeyDown handler
+        │   ├── fn_keyDown.sqf         - hardcoded keybinds -> fnc_adjustThrottle
+        │   ├── fn_setThrottle.sqf     - drives setCruiseControl
+        │   ├── fn_adjustThrottle.sqf  - +/- delta from a keypress
+        │   ├── fn_onGetInManEH.sqf    - GetInMan EH dispatcher (filters to local player)
+        │   ├── fn_onGetOutManEH.sqf   - GetOutMan EH dispatcher
+        │   ├── fn_onKilledEH.sqf      - Killed EH dispatcher
+        │   ├── fn_onGetInMan.sqf      - init state, show HUD, start watch loop
+        │   ├── fn_onGetOutMan.sqf     - release control, hide HUD
+        │   └── fn_updateHud.sqf       - repaint the HUD text
         └── ui/
             └── RscTitles.hpp   - the HUD dialog resource
 ```

@@ -24,7 +24,7 @@
  * this as capable of stalling mission load in some cases).
  *
  * There's no in-game "Configure Addons" rebind menu without CBA - see
- * fnc_keyDown.sqf / README.md "Keybinds" for the hardcoded defaults and
+ * fn_keyDown.sqf / README.md "Keybinds" for the hardcoded defaults and
  * how to change them.
  *
  * Arguments:

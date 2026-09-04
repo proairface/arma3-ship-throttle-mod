@@ -38,12 +38,6 @@
 
 params ["_key", "_shift"];
 
-// TEMPORARY WIDE DIAGNOSTIC - logs every single keypress the handler
-// ever sees, regardless of key or context, to establish ground truth
-// about whether/what this handler receives at all. Remove once the
-// W/S detection is confirmed working.
-systemChat format ["[ShipThrottle] KeyDown seen: key=%1 shift=%2 vehShip=%3 driver=%4", _key, _shift, (vehicle player) isKindOf "Ship", (vehicle player) isKindOf "Ship" && {driver (vehicle player) == player}];
-
 if (_key != DIK_W && {_key != DIK_S}) exitWith {false};
 
 private _handled = (vehicle player) isKindOf "Ship" && {driver (vehicle player) == player};
@@ -58,9 +52,6 @@ missionNamespace setVariable ["olk_ship_throttle_heldKeys", _heldKeys];
 private _delta = 0;
 if (_key == DIK_W) then { _delta = if (_shift) then {1} else {10} };
 if (_key == DIK_S) then { _delta = if (_shift) then {-1} else {-10} };
-
-// TEMPORARY DIAGNOSTIC BREADCRUMB - remove once confirmed working.
-systemChat format ["[ShipThrottle] key handled, delta=%1", _delta];
 
 [_delta] call olk_fnc_adjustThrottle;
 true

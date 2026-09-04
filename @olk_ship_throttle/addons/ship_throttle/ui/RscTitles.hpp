@@ -19,21 +19,26 @@ class RscTitles
                 // `style` turned out to be a REQUIRED config entry for
                 // this control (confirmed by an in-game "No entry
                 // ...style" error after a previous build omitted it
-                // entirely, thinking it was redundant/unverified - that
-                // was a mistake, removing a required field is worse than
-                // guessing its value). ST_LEFT = 0 is confirmed on the BI
-                // wiki and is a safe baseline; actual right-alignment
-                // still comes from the inline <t align='right'> tag in
+                // entirely). ST_LEFT = 0 is confirmed on the BI wiki and
+                // is a safe baseline; actual centered alignment still
+                // comes from the inline <t align='center'> tag in
                 // fn_updateHud.sqf, independent of this value.
                 style = 0; // ST_LEFT
-                x = "safezoneX + safezoneW - 0.16";
-                y = "safezoneY + safezoneH - 0.06";
-                w = 0.14;
-                h = 0.045;
-                colorText[] = {1, 1, 1, 1};
-                colorBackground[] = {0, 0, 0, 0.35};
-                font = "RobotoCondensedBold";
-                size = 0.04;
+                // Bottom-center, sized like a real vehicle instrument
+                // readout rather than a small tucked-away corner label.
+                x = "safezoneX + safezoneW / 2 - 0.08";
+                y = "safezoneY + safezoneH - 0.12";
+                w = 0.16;
+                h = 0.07;
+                // Soft cyan-white, closer to Arma's own vehicle HUD/
+                // instrument text tone than plain white.
+                colorText[] = {0.65, 1, 1, 1};
+                colorBackground[] = {0, 0, 0, 0.45};
+                // PuristaSemiBold is Arma 3's own UI font (confirmed via
+                // a real community pilot-HUD mod's config) - an earlier
+                // build guessed "RobotoCondensedBold" without checking.
+                font = "PuristaSemiBold";
+                size = 0.07;
                 shadow = 1;
                 text = "";
             };

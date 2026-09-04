@@ -3,9 +3,9 @@
 An [Arma 3](https://arma3.com/) addon that replaces the default
 "hold W to accelerate" control scheme for `Ship`-class vehicles (boats,
 RHIBs, speedboats, etc.) with a **jet-style, set-and-hold throttle
-percentage**: tap a key to step the throttle up or down, the boat
-accelerates/holds that speed on its own, and a small HUD readout in the
-bottom-right shows the current throttle %.
+percentage**: tap W/S to step the throttle up or down, the boat
+accelerates/holds that speed on its own, and a HUD readout at the
+bottom-center of the screen shows the current throttle %.
 
 **Zero dependencies** - no CBA_A3 required. (Earlier builds used CBA for
 keybinding/settings/events; that was dropped after a persistent "requires
@@ -15,17 +15,16 @@ setup, the mod now only relies on vanilla Arma 3 mechanisms. See
 [Design decisions](#design-decisions) for what replaced what, and the
 tradeoff this brings back: no in-game rebind menu.)
 
-> ⚠️ **Status: untested against a live game.** This addon was built and
-> documented in a sandboxed environment with no access to Arma 3 itself.
-> Every scripting API used below was checked against the Bohemia
-> Interactive Community wiki (where reachable) or Arma's own documented
-> config mechanisms - not against a live client. The packed `.pbo` has
-> been verified byte-for-byte (headers, the embedded `prefix`/`author`
-> properties, every file's size, and the trailing SHA1 checksum all
-> round-trip correctly through an independent reader), so the *file
-> format* is sound - but the *behavior* hasn't been driven in-game yet.
-> Treat it as "should work" rather than "confirmed working," and go
-> through [Testing checklist](#testing-checklist) before relying on it.
+> ✅ **Status: confirmed working in a live game** (as of this writing) -
+> throttle steps via W/S, holds speed via `setCruiseControl`, and the HUD
+> updates correctly. Getting here took several real bugs found through
+> actual in-game testing, not just review - see
+> [Known risks](#known-risks--unverified-assumptions) for the two most
+> notable ones (a config `EventHandlers` naming mistake, and a wrong
+> `CfgFunctions` file-naming assumption) and the [Changelog](CHANGELOG.md)
+> for the full history. What's still genuinely unverified - reverse
+> throttle behavior chief among them - is called out explicitly below;
+> go through the [Testing checklist](#testing-checklist) for those.
 
 ## Requirements
 
@@ -130,11 +129,19 @@ Answers to the brief's open questions, and choices made while building:
   otherwise spam +10%/frame instead of +10%/tap. `fn_keyDown.sqf` tracks
   currently-held keys (cleared by `fn_keyUp.sqf` on release) so a held
   key steps exactly once.
-- **HUD style**: simple structured-text overlay (`"<pct>% ⚙"` /
-  `"REV <pct>%"`), bottom-right, shown only while driving a `Ship`. No
-  custom art/dialog work - matches the brief's "happy with a simple
-  text+icon overlay" fallback option. Pure vanilla `cutRsc`/`RscTitles` -
-  never depended on CBA.
+- **HUD style**: structured-text overlay (`"<pct>% ⚙"` / `"REV <pct>%"`),
+  bottom-center, shown only while driving a `Ship`. Pure vanilla
+  `cutRsc`/`RscTitles` - never depended on CBA. Originally a small
+  bottom-right text box; redesigned after real-world feedback to be
+  larger and more legible, using `PuristaSemiBold` (Arma 3's own UI
+  font, confirmed against a real community pilot-HUD mod's config
+  rather than guessed) and a soft cyan-white tone closer to Arma's
+  vehicle-instrument look. Faithfully reproducing the actual vanilla
+  jet MFD's throttle gauge graphics (not just its general look) would
+  mean depending on jet-specific internal dialog resources this addon
+  has no reason to touch for a boat - if you want it closer to a
+  specific reference image, share it and the position/size/colors here
+  can be tuned further.
 - **Idle (0%) behavior**: fully **releases** cruise control
   (`setCruiseControl [0, false]`) rather than actively holding station at
   0 speed (`setCruiseControl [0, true]`). At 0% the hull coasts/drifts

@@ -26,9 +26,9 @@ private _ctrl = _display displayCtrl 62100;
 if (isNull _ctrl) exitWith {};
 
 private _label = if (_pct < 0) then {
-    format ["<t align='right'>REV %1%%</t>", round abs _pct]
+    format ["<t align='center'>REV %1%%</t>", round abs _pct]
 } else {
-    format ["<t align='right'>%1%% ⚙</t>", round _pct]
+    format ["<t align='center'>%1%% ⚙</t>", round _pct]
 };
 
 _ctrl ctrlSetStructuredText parseText _label;

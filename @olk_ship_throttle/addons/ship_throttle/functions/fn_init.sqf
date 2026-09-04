@@ -37,32 +37,12 @@
  * Public: No
  */
 
-// TEMPORARY DIAGNOSTIC BREADCRUMBS (systemChat) - remove once the mod is
-// confirmed working end to end. Each one pinpoints how far execution got.
-systemChat "[ShipThrottle] postInit started";
-
 [] spawn {
-    // TEMPORARY: confirms this spawn scope itself actually started,
-    // distinct from the retry loop below - if this message never shows
-    // up at all, the spawn itself is failing before ever reaching the
-    // loop, which is a different problem than findDisplay 46 being slow.
-    systemChat "[ShipThrottle] keybind-registration spawn entered";
-
-    // TEMPORARY: was a plain `waitUntil` before - replaced with a
-    // logged, timed retry loop since we never got confirmation this
-    // step (message #2 below) was actually being reached at all.
     private _display = displayNull;
-    private _elapsed = 0;
     while {isNull _display} do {
         _display = findDisplay 46;
-        if (isNull _display) then {
-            sleep 1;
-            _elapsed = _elapsed + 1;
-            systemChat format ["[ShipThrottle] still waiting for findDisplay 46... %1s elapsed", _elapsed];
-        };
+        if (isNull _display) then { sleep 1 };
     };
-
-    systemChat format ["[ShipThrottle] findDisplay 46 found after %1s, registering KeyDown/KeyUp", _elapsed];
 
     _display displayAddEventHandler ["KeyDown", {
         params ["_display", "_key", "_shift"];
@@ -73,20 +53,15 @@ systemChat "[ShipThrottle] postInit started";
         params ["_display", "_key"];
         [_key] call olk_fnc_keyUp
     }];
-
-    systemChat "[ShipThrottle] keybind handler registered";
 };
 
 [] spawn {
-    systemChat "[ShipThrottle] watchdog loop started";
-
     while {true} do {
         private _veh = vehicle player;
         private _shouldBeDriving = !isNull player && {_veh isKindOf "Ship"} && {driver _veh == player};
         private _isWatching = !isNull _veh && {_veh getVariable ["olk_watching", false]};
 
         if (_shouldBeDriving && !_isWatching) then {
-            systemChat "[ShipThrottle] watchdog detected ship driver -> starting throttle";
             [_veh] call olk_fnc_onGetInMan;
         };
 

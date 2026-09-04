@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.3.5 - polish pass: remove diagnostics, redesign the HUD
+
+**First version confirmed fully working in a live game**, following the
+fixes in 0.3.1-0.3.4 below.
+
+- Removed all temporary `systemChat` diagnostic messages added while
+  chasing 0.2.x/0.3.x bugs (postInit/keybind-registration/watchdog
+  checkpoints, the wide per-keypress logger, the findDisplay 46 retry
+  logger). The mod is silent now except for the HUD itself.
+- Redesigned the HUD after feedback that the old bottom-right text box
+  was small and hard to read: moved to bottom-center, enlarged, and
+  restyled with `PuristaSemiBold` (Arma 3's own real UI font, confirmed
+  against a working community pilot-HUD mod rather than guessed) and a
+  soft cyan-white tone closer to Arma's vehicle-instrument look, instead
+  of the earlier plain white-on-black box with an unverified font name.
+
+## 0.3.1-0.3.4 - diagnosing and fixing "loads fine, does nothing for W/S"
+
+Real-world testing after 0.3.0 showed the HUD/entry-detection working
+but W/S never registering at all - not even a wide, unconditional
+per-keypress logger caught anything. Root-caused across these builds:
+
+- **`CAManBase`'s re-declared parent class was wrong.** `config.cpp` had
+  `class Civilian: Man {}; class CAManBase: Civilian {...}`, but the
+  real base-game hierarchy has `CAManBase` inheriting from `Man`
+  directly (confirmed against a real mod's config:
+  `class Man: Land {...}; class CAManBase: Man {...};`, no `Civilian`
+  anywhere in it). Reopening an existing engine class with a mismatched
+  parent is a known Arma config problem. Fixed to inherit directly from
+  `Man`.
+- **A regression introduced while fixing the above**: a review pass
+  removed the HUD control's `style` property, reasoning it was an
+  unverified/redundant alignment guess. `style` turned out to be a
+  *required* config entry for this control type, confirmed by an
+  in-game `No entry '...style'` error the moment the HUD tried to load.
+  Restored with `style = 0` (`ST_LEFT`, confirmed on the BI wiki).
+- The root cause of "W/S never registers" itself was never conclusively
+  isolated beyond these fixes - both were real, confirmed bugs, and
+  after fixing them the mod started working end to end. It's possible
+  one or both were the actual cause, or that some other factor resolved
+  itself; the important fact is the current build is now verified
+  working in-game, not just by source review.
+- Added (then, after confirmation, removed in 0.3.5) extensive
+  `systemChat` diagnostics at every stage of the init/keybind/watchdog
+  chain to localize exactly where execution was stopping.
+
 ## 0.3.0 - W/S jet-style throttle instead of a dedicated key
 
 - Confirmed working end to end in real testing (postInit, keybind

@@ -34,5 +34,8 @@ if (_key == DIK_SUBTRACT) then { _delta = if (_shift) then {-1} else {-10} };
 
 if (_delta == 0) exitWith {false};
 
+// TEMPORARY DIAGNOSTIC BREADCRUMB - remove once confirmed working.
+systemChat format ["[ShipThrottle] key handled, delta=%1", _delta];
+
 [_delta] call olk_fnc_adjustThrottle;
 true

@@ -33,6 +33,9 @@ if (isNull _ship) exitWith {};
 if (_ship getVariable ["olk_watching", false]) exitWith {};
 _ship setVariable ["olk_watching", true];
 
+// TEMPORARY DIAGNOSTIC BREADCRUMB - remove once confirmed working.
+systemChat "[ShipThrottle] onGetInMan running, showing HUD";
+
 [_ship, 0] call olk_fnc_setThrottle;
 
 "olk_ship_throttle" cutRsc ["olk_ship_throttle_hud", "PLAIN"];

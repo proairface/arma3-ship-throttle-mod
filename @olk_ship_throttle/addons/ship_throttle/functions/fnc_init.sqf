@@ -37,6 +37,10 @@
  * Public: No
  */
 
+// TEMPORARY DIAGNOSTIC BREADCRUMBS (systemChat) - remove once the mod is
+// confirmed working end to end. Each one pinpoints how far execution got.
+systemChat "[ShipThrottle] postInit started";
+
 [] spawn {
     private _display = displayNull;
     waitUntil { !isNull (_display = findDisplay 46) };
@@ -45,15 +49,20 @@
         params ["_display", "_key", "_shift"];
         [_key, _shift] call olk_fnc_keyDown
     }];
+
+    systemChat "[ShipThrottle] keybind handler registered";
 };
 
 [] spawn {
+    systemChat "[ShipThrottle] watchdog loop started";
+
     while {true} do {
         private _veh = vehicle player;
         private _shouldBeDriving = !isNull player && {_veh isKindOf "Ship"} && {driver _veh == player};
         private _isWatching = !isNull _veh && {_veh getVariable ["olk_watching", false]};
 
         if (_shouldBeDriving && !_isWatching) then {
+            systemChat "[ShipThrottle] watchdog detected ship driver -> starting throttle";
             [_veh] call olk_fnc_onGetInMan;
         };
 

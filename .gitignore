@@ -1,0 +1,14 @@
+# Packed addon output
+*.pbo
+*.pbo.bisign
+*.biprivatekey
+
+# HEMTT
+.hemttout/
+.hemtt/cache/
+
+# OS/editor cruft
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

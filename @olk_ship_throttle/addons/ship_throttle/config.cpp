@@ -8,8 +8,8 @@ class CfgPatches
         requiredAddons[] = {};
         author = "Olaf";
         authors[] = {"Olaf"};
-        version = "0.4.0";
-        versionStr = "0.4.0";
+        version = "0.4.1";
+        versionStr = "0.4.1";
     };
 };
 
@@ -25,6 +25,8 @@ class CfgFunctions
             class keyUp {};
             class setThrottle {};
             class startReverseLoop {};
+            class brakeHoldWatcher {};
+            class startBrakeLoop {};
             class adjustThrottle {};
             class onGetInMan {};
             class onGetOutMan {};

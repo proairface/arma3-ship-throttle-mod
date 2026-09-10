@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.1 - hold S to brake
+
+Feedback after 0.4.0: losing native S-as-brake (a consequence of the
+0.3.0 W/S hijack) meant no fast way to slow down, just repeated -10%
+taps. Brainstormed a few options with the user; went with "hold vs tap"
+since it restores existing muscle memory without a new keybind.
+
+- Tapping S still steps -10%/-1% exactly as before.
+- Holding S past 0.3s (`fn_brakeHoldWatcher.sqf`, a new hold-vs-tap
+  detector) now switches into continuous active braking
+  (`fn_startBrakeLoop.sqf`) that directly damps the ship's velocity
+  every 0.15s, rather than repeatedly retargeting `setCruiseControl` to
+  lower speeds - retargeting alone would just have cruise control's own
+  PID fight/mask the deceleration.
+- Scoped the existing brake-detection watch loop to also skip while
+  `olk_braking` is true, so it doesn't mistake our own deliberate
+  cruise-control release for an unexpected cancellation and prematurely
+  zero the throttle mid-brake.
+- New mechanism, not yet driven in-game - see README "Known risks" for
+  what's untested (decay factor tuning, the release-mid-brake handoff,
+  transitioning through 0% into reverse while holding).
+
 ## 0.4.0 - fix engine auto-start and reverse (both confirmed broken in real testing)
 
 Feedback from real play: throttle % climbed with no actual boat

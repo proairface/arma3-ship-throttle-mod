@@ -86,13 +86,15 @@ Without CBA there's no "Configure Addons" rebind menu, so the keys are
 
 | Action | Key |
 |---|---|
-| Throttle +10% | W |
-| Throttle -10% | S |
-| Throttle +1% | Shift + W |
-| Throttle -1% | Shift + S |
+| Throttle +10% | tap W |
+| Throttle -10% | tap S |
+| Throttle +1% | tap Shift + W |
+| Throttle -1% | tap Shift + S |
+| **Active brake** (continuous deceleration) | **hold S** past ~0.3s |
 
-Holding a key steps once (not once per frame) - see "W/S key-repeat
-debounce" below.
+Tapping a key steps once (not once per frame) - see "W/S key-repeat
+debounce" below. Holding S specifically switches from stepping into
+continuous active braking - see "Hold S to brake" below.
 
 To use different keys: edit the `DIK_*` constants in
 `functions/fn_keyDown.sqf` and `fn_keyUp.sqf` (see
@@ -136,6 +138,18 @@ Answers to the brief's open questions, and choices made while building:
   otherwise spam +10%/frame instead of +10%/tap. `fn_keyDown.sqf` tracks
   currently-held keys (cleared by `fn_keyUp.sqf` on release) so a held
   key steps exactly once.
+- **Hold S to brake** (added after real-world feedback that losing
+  native S-as-brake, a direct consequence of the W/S hijack above, felt
+  bad - no fast way to slow down, just repeated -10% taps). A tap of S
+  still steps -10%/-1% as before; holding it past 0.3s
+  (`fn_brakeHoldWatcher.sqf`) switches into continuous active braking
+  (`fn_startBrakeLoop.sqf`) that directly damps the ship's velocity
+  every 0.15s, restoring the "hold to brake" muscle memory without a new
+  keybind. Deliberately *doesn't* drive this by repeatedly retargeting
+  `setCruiseControl` to lower speeds - that would just have cruise
+  control's own PID fight/mask the deceleration; see
+  `fn_startBrakeLoop.sqf` for why. This is the newest, least-tested
+  mechanism in the mod (see Known risks).
 - **HUD style**: structured-text overlay (`"<pct>% ⚙"` / `"REV <pct>%"`),
   bottom-center, shown only while driving a `Ship`. Pure vanilla
   `cutRsc`/`RscTitles` - never depended on CBA. Originally a small
@@ -191,6 +205,18 @@ Answers to the brief's open questions, and choices made while building:
 
 Carried over from the original brief, plus what this build added:
 
+- ⚠️ **UNVERIFIED - the active-braking velocity damping.** Brand new
+  mechanism (`fn_startBrakeLoop.sqf`), not yet driven in-game. Untested:
+  whether a 0.85 decay factor every 0.15s feels right (too weak, too
+  sudden, or fine), whether directly setting velocity fights the hull's
+  own buoyancy/wave physics in a way that looks wrong, and the handoff
+  moment when S is released mid-brake and control passes back to
+  `fn_setThrottle.sqf`. Tune the decay factor/interval in
+  `fn_startBrakeLoop.sqf` to taste once tested. Also means holding S for
+  a while now walks *through* 0% into reverse rather than stopping at
+  idle - untested whether that transition feels smooth or jarring (see
+  testing checklist item 7, which already covered the tap-based version
+  of this transition).
 - 🐛 **FIXED - the engine didn't start itself.** Real testing showed
   throttle % climbing with no actual boat movement: `setCruiseControl`
   doesn't turn a ship's engine on by itself. Fixed with `engineOn true`
@@ -320,10 +346,18 @@ Carried over from the original brief, plus what this build added:
    loop as a fallback).
 7. While cruising forward, decelerate straight through 0% into reverse
    in one continuous series of S taps; confirm there's no stuck/confused
-   state at the transition (this is the newest, least-tested code path).
-8. Repeat steps 1-4 on a second, differently-sized boat class to catch
+   state at the transition.
+8. **Accelerate to a decent speed, then hold S** (don't tap - hold past
+   ~0.3s); confirm it switches into active braking and the boat visibly
+   slows down quickly, not just via repeated -10% taps. Release S
+   partway through; confirm it resumes normal forward/idle/reverse
+   handling cleanly from wherever it landed, with no stuck state. Then
+   try holding S long enough to pass through 0% into reverse - confirm
+   that handoff is also clean. This is the newest, least-tested code
+   path in the mod.
+9. Repeat steps 1-4 on a second, differently-sized boat class to catch
    per-class `maxSpeed` weirdness.
-9. Basic MP test (2 clients, ideally a dedicated server) to confirm no
+10. Basic MP test (2 clients, ideally a dedicated server) to confirm no
    desync/host-authority issues - both `setCruiseControl` and
    `setVelocity` are typically local-only commands, so this should be
    per-client with no sync needed, but that's not yet confirmed for the
@@ -340,8 +374,10 @@ Carried over from the original brief, plus what this build added:
         ├── config.cpp          - CfgFunctions, CAManBase EventHandlers, RscTitles include
         ├── functions/
         │   ├── fn_init.sqf            - postInit=1, registers KeyDown/KeyUp handlers
-        │   ├── fn_keyDown.sqf         - W/S hijack -> adjustThrottle (debounced)
-        │   ├── fn_keyUp.sqf           - clears the key-repeat debounce tracker
+        │   ├── fn_keyDown.sqf         - W/S hijack -> adjustThrottle; S also starts a brake-hold watcher
+        │   ├── fn_keyUp.sqf           - clears debounce; applies a deferred S tap, or stops braking
+        │   ├── fn_brakeHoldWatcher.sqf - 0.3s hold-vs-tap detector for S
+        │   ├── fn_startBrakeLoop.sqf  - continuous active braking (velocity damping) while S is held
         │   ├── fn_setThrottle.sqf     - forward/idle via setCruiseControl, reverse via startReverseLoop
         │   ├── fn_startReverseLoop.sqf - scripted velocity-based reverse (setCruiseControl doesn't reverse)
         │   ├── fn_adjustThrottle.sqf  - +/- delta from a keypress

@@ -16,14 +16,17 @@ setup, the mod now only relies on vanilla Arma 3 mechanisms. See
 tradeoff this brings back: no in-game rebind menu.)
 
 > ✅ **Status: confirmed working in a live game** (as of this writing) -
-> throttle steps via W/S, holds speed via `setCruiseControl`, and the HUD
-> updates correctly. Getting here took several real bugs found through
-> actual in-game testing, not just review - see
-> [Known risks](#known-risks--unverified-assumptions) for the two most
-> notable ones (a config `EventHandlers` naming mistake, and a wrong
-> `CfgFunctions` file-naming assumption) and the [Changelog](CHANGELOG.md)
-> for the full history. What's still genuinely unverified - reverse
-> throttle behavior chief among them - is called out explicitly below;
+> forward throttle steps via W/S and holds speed via `setCruiseControl`,
+> reverse works via a scripted velocity loop, the engine starts
+> automatically, and the HUD updates correctly. Getting here took
+> several real bugs found through actual in-game testing, not just
+> review - see [Known risks](#known-risks--unverified-assumptions) and
+> the [Changelog](CHANGELOG.md) for the full history, including two
+> confirmed-wrong assumptions from the original brief (negative
+> `setCruiseControl` speed does not reverse a ship; the engine doesn't
+> start itself). What's newest and least field-tested - the reverse
+> velocity loop's smoothness, and the forward/reverse transition - is
+> called out explicitly in [Known risks](#known-risks--unverified-assumptions);
 > go through the [Testing checklist](#testing-checklist) for those.
 
 ## Requirements
@@ -109,12 +112,16 @@ Answers to the brief's open questions, and choices made while building:
   method, duplicate-install check). Rather than keep chasing an
   unreproducible environment issue, the addon was rebuilt on vanilla
   Arma 3 mechanisms only - see the replacements below.
-- **Reverse handling**: **negative throttle** (-100% to 100%), rather
-  than relying only on the native S/reverse key. See
-  [Known risks](#known-risks--unverified-assumptions) below - this is
-  the least-verified part of the mod, and there's a `profileNamespace`
-  toggle to fall back to native-reverse if it doesn't pan out (see
-  [Keybinds](#keybinds) note and `fn_setThrottle.sqf`).
+- **Reverse handling**: **negative throttle** (-100% to 100%). Confirmed
+  in real testing that `setCruiseControl` does not reverse a ship with a
+  negative speed (this was the mod's single biggest unverified risk from
+  day one, flagged as far back as the original brief). Reverse is
+  instead driven by a scripted velocity loop
+  (`fn_startReverseLoop.sqf`) - see [Known risks](#known-risks--unverified-assumptions).
+  The originally-planned fallback ("release control, let native S
+  reverse") no longer makes sense either, since S is fully consumed by
+  `fn_keyDown.sqf` for throttle-down now, not available as a native
+  reverse input.
 - **Throttle step size**: 10% per tap, with Shift held for ±1% fine
   control.
 - **Keys: W/S, not a dedicated key** (changed after real-world testing).
@@ -184,6 +191,13 @@ Answers to the brief's open questions, and choices made while building:
 
 Carried over from the original brief, plus what this build added:
 
+- 🐛 **FIXED - the engine didn't start itself.** Real testing showed
+  throttle % climbing with no actual boat movement: `setCruiseControl`
+  doesn't turn a ship's engine on by itself. Fixed with `engineOn true`
+  in `fn_onGetInMan.sqf` (once, right when the player becomes driver)
+  and again defensively in `fn_setThrottle.sqf` whenever throttle is
+  positive, in case something else turns the engine off mid-session.
+
 - 🐛 **FIXED - `CAManBase`'s re-declared parent class was wrong.**
   `config.cpp` re-opened `CAManBase` as `class CAManBase: Civilian`, but
   the real base game hierarchy has `CAManBase` inheriting from `Man`
@@ -208,17 +222,31 @@ Carried over from the original brief, plus what this build added:
   Restored with `style = 0` (`ST_LEFT`, confirmed on the BI wiki as a
   safe baseline) - actual right-alignment still comes from the inline
   tag, independent of this value.
-- ⚠️ **UNVERIFIED - reverse via negative `setCruiseControl` speed.** The
-  BI wiki only documents `setCruiseControl`'s speed parameter for
-  positive km/h values; there's no documented negative-speed/reverse
-  behavior, and secondhand reports found while researching this were
-  inconclusive (one summary suggested a negative value might just
-  prevent forward movement rather than reverse it - unconfirmed either
-  way). **Test this first** (see checklist below). If it doesn't work as
-  hoped, run `profileNamespace setVariable ["olk_ship_throttle_reverseViaCruiseControl", false]; saveProfileNamespace;`
-  in the debug console - reverse throttle then just releases cruise
-  control and expects the player to back up with the native S key, same
-  as the brief's non-negative-throttle alternative.
+- 🐛 **CONFIRMED BROKEN, then fixed - reverse via negative
+  `setCruiseControl` speed.** This was flagged as the mod's single
+  biggest unverified risk from the original brief onward: the BI wiki
+  only documents `setCruiseControl`'s speed parameter for positive km/h
+  values. Real testing confirmed it: a negative speed does not reverse
+  the ship. Replaced with a scripted velocity loop
+  (`fn_startReverseLoop.sqf`) that sets the ship's velocity opposite its
+  forward direction every 0.05s, scaled to `|throttle%| * maxSpeed`,
+  while preserving vertical velocity so wave bobbing isn't fought. This
+  is a different, cruder mechanism than forward throttle's
+  `setCruiseControl`-based PID hold - it doesn't correct for external
+  forces (waves, collisions, current) between ticks the way cruise
+  control does, so reverse may feel less "held" than forward. Untested:
+  how it behaves in choppier water, at the moment reverse starts from a
+  significant forward speed, and in multiplayer (velocity-setting is
+  typically local-only, same locality assumption as `setCruiseControl` -
+  see the MP risk below).
+- ⚠️ **NEW ASSUMPTION - the brake-detection watch loop only checks
+  positive throttle.** Since reverse now deliberately keeps cruise
+  control released (`autoThrust == false` the whole time it's active),
+  the existing "did the player brake?" check in `fn_onGetInMan.sqf`
+  would misfire during every reverse if it still ran for negative
+  throttle too - it's now scoped to `_pct > 0` only. Not yet confirmed
+  this doesn't have some other edge case (e.g. braking while cruising
+  forward, then immediately reversing in the same watch-loop tick).
 - 🐛 **FIXED (was a real bug, not just a risk) - config EventHandlers
   need the exact literal event name.** The first zero-dependency build
   registered `class EventHandlers { olk_ship_throttle_getInMan = "..."; }`
@@ -271,30 +299,35 @@ Carried over from the original brief, plus what this build added:
 ## Testing checklist
 
 1. Enter a vanilla RHIB as driver; confirm the throttle HUD appears at
-   0% and the hull coasts/drifts rather than being held rigidly in
-   place. (This alone confirms the `GetInMan` assumption above holds.)
-2. Increase throttle to 50% (Numpad +); confirm the boat accelerates on
-   its own without holding W, and roughly holds a mid-range speed.
+   0% and the engine is audibly/visibly running (confirms the
+   `engineOn` fix and the `GetInMan` assumption both hold).
+2. Tap W a few times to increase throttle; confirm the boat accelerates
+   on its own without holding W, and roughly holds a mid-range speed at
+   ~50%.
 3. Increase to 100%; compare against the boat's known/observed top speed
    to sanity-check the `maxSpeed` assumption.
-4. **Decrease throttle below 0% (reverse, Numpad -).** This is the
-   biggest unknown in the mod - confirm the boat actually backs up. If
-   it doesn't (or behaves oddly, e.g. refuses to move forward again
-   afterwards), set the `profileNamespace` toggle mentioned above and
-   re-test - reverse should then just release cruise control and expect
-   native S input.
-5. Tap S (brake); confirm cruise control disengages and the HUD/throttle
-   resets to 0%.
-6. Exit the vehicle mid-throttle, re-enter as driver; confirm it comes
-   back in a clean 0% state rather than resuming the old value.
-7. Switch from driver to a gunner/cargo seat *without* exiting the
-   vehicle; confirm the HUD hides and cruise control releases (should be
-   immediate via `GetOutMan`, or within ~0.5s via the watch loop as a
-   fallback).
+4. Tap S past 0% into reverse; confirm the boat actually backs up
+   smoothly (not jerky/stuttering - the 0.05s velocity-loop interval was
+   chosen to feel smooth but hasn't been visually confirmed). Then tap W
+   back past 0% into forward again; confirm cruise control correctly
+   takes back over (no leftover reverse velocity/stuck state).
+5. Exit the vehicle mid-throttle (either direction), re-enter as driver;
+   confirm it comes back in a clean 0% state rather than resuming the
+   old value, and that the engine starts again.
+6. Switch from driver to a gunner/cargo seat *without* exiting the
+   vehicle; confirm the HUD hides and cruise control/reverse releases
+   (should be immediate via `GetOutMan`, or within ~0.5s via the watch
+   loop as a fallback).
+7. While cruising forward, decelerate straight through 0% into reverse
+   in one continuous series of S taps; confirm there's no stuck/confused
+   state at the transition (this is the newest, least-tested code path).
 8. Repeat steps 1-4 on a second, differently-sized boat class to catch
    per-class `maxSpeed` weirdness.
 9. Basic MP test (2 clients, ideally a dedicated server) to confirm no
-   desync/host-authority issues.
+   desync/host-authority issues - both `setCruiseControl` and
+   `setVelocity` are typically local-only commands, so this should be
+   per-client with no sync needed, but that's not yet confirmed for the
+   new reverse loop specifically.
 
 ## Repository layout
 
@@ -309,7 +342,8 @@ Carried over from the original brief, plus what this build added:
         │   ├── fn_init.sqf            - postInit=1, registers KeyDown/KeyUp handlers
         │   ├── fn_keyDown.sqf         - W/S hijack -> adjustThrottle (debounced)
         │   ├── fn_keyUp.sqf           - clears the key-repeat debounce tracker
-        │   ├── fn_setThrottle.sqf     - drives setCruiseControl
+        │   ├── fn_setThrottle.sqf     - forward/idle via setCruiseControl, reverse via startReverseLoop
+        │   ├── fn_startReverseLoop.sqf - scripted velocity-based reverse (setCruiseControl doesn't reverse)
         │   ├── fn_adjustThrottle.sqf  - +/- delta from a keypress
         │   ├── fn_onGetInManEH.sqf    - GetInMan EH dispatcher (filters to local player)
         │   ├── fn_onGetOutManEH.sqf   - GetOutMan EH dispatcher

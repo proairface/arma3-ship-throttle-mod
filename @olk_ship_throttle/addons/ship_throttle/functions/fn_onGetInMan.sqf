@@ -2,17 +2,21 @@
  * Author: Olaf
  * Ship Throttle - fnc_onGetInMan
  *
- * Called when the local player becomes a Ship's driver. Resets the
- * throttle to a clean 0%, shows the throttle HUD, and starts a
- * low-frequency watch loop (a scheduled `spawn` + `sleep`, the vanilla
- * equivalent of a per-frame handler) that:
+ * Called when the local player becomes a Ship's driver. Starts the
+ * engine, resets the throttle to a clean 0%, shows the throttle HUD,
+ * and starts a low-frequency watch loop (a scheduled `spawn` + `sleep`,
+ * the vanilla equivalent of a per-frame handler) that:
  *  - detects the player leaving the driver seat (seat change, exiting,
  *    death) and hands off to fnc_onGetOutMan;
  *  - detects the vehicle's native brake/S input silently cancelling
- *    cruise control, and resets the stored throttle to 0 so the HUD
- *    doesn't show a stale value (BI wiki: "applying brakes disables
- *    Cruise Control" - ASSUMPTION, not confirmed for boats specifically,
- *    see README.md "Known risks").
+ *    cruise control while throttle is positive, and resets the stored
+ *    throttle to 0 so the HUD doesn't show a stale value (BI wiki:
+ *    "applying brakes disables Cruise Control" - ASSUMPTION, not
+ *    confirmed for boats specifically, see README.md "Known risks").
+ *    Only checked for *positive* throttle - during reverse (negative
+ *    throttle), cruise control is deliberately released/off (see
+ *    fn_setThrottle.sqf/fn_startReverseLoop.sqf), so autoThrust==false
+ *    is expected there, not a brake event.
  *
  * The watch loop only *reads* getCruiseControl - it never calls
  * setCruiseControl on a timer, since that would repeatedly reset the
@@ -33,6 +37,11 @@ if (isNull _ship) exitWith {};
 if (_ship getVariable ["olk_watching", false]) exitWith {};
 _ship setVariable ["olk_watching", true];
 
+// The engine doesn't start itself just because cruise control is set -
+// confirmed in real testing (throttle % would climb with no actual
+// movement until the engine was turned on).
+_ship engineOn true;
+
 [_ship, 0] call olk_fnc_setThrottle;
 
 "olk_ship_throttle" cutRsc ["olk_ship_throttle_hud", "PLAIN"];
@@ -44,7 +53,7 @@ _ship setVariable ["olk_watching", true];
         !isNull _ship && {alive _ship} && {vehicle player == _ship} && {driver _ship == player}
     } do {
         private _pct = _ship getVariable ["olk_throttlePct", 0];
-        if (_pct != 0) then {
+        if (_pct > 0) then {
             (getCruiseControl _ship) params ["", "_autoThrust"];
             if (!_autoThrust) then {
                 [_ship, 0] call olk_fnc_setThrottle;

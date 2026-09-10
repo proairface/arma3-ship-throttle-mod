@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.4.0 - fix engine auto-start and reverse (both confirmed broken in real testing)
+
+Feedback from real play: throttle % climbed with no actual boat
+movement, and reverse didn't work at all.
+
+- **Engine auto-start.** `setCruiseControl` doesn't turn a ship's engine
+  on by itself. Added `engineOn true` in `fn_onGetInMan.sqf` (once, when
+  the player becomes driver) and again in `fn_setThrottle.sqf` whenever
+  throttle is positive, in case the engine gets switched off some other
+  way mid-session.
+- **Reverse.** Confirmed (not just suspected) that a negative
+  `setCruiseControl` speed does not reverse a ship - this was the mod's
+  single biggest unverified assumption since the original brief.
+  Replaced with a new scripted velocity loop
+  (`fn_startReverseLoop.sqf`): every 0.05s while throttle is negative,
+  sets the ship's velocity opposite its horizontal forward direction at
+  a speed proportional to `|throttle%| * maxSpeed`, preserving vertical
+  velocity so wave bobbing isn't fought. This replaces the old
+  `profileNamespace` "release control, use native S" fallback entirely -
+  that fallback no longer made sense once S became fully owned by
+  `fn_keyDown.sqf` for throttle-down (0.3.0), since native reverse input
+  isn't reachable anymore either.
+- Scoped the watch loop's brake-detection check to positive throttle
+  only (`_pct > 0`, not `_pct != 0`) - reverse deliberately keeps cruise
+  control released the whole time, which would otherwise look
+  indistinguishable from a brake event and get incorrectly reset to 0%
+  every 0.5s.
+
 ## 0.3.5 - polish pass: remove diagnostics, redesign the HUD
 
 **First version confirmed fully working in a live game**, following the

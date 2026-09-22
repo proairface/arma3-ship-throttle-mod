@@ -8,8 +8,8 @@ class CfgPatches
         requiredAddons[] = {};
         author = "Olaf";
         authors[] = {"Olaf"};
-        version = "0.4.1";
-        versionStr = "0.4.1";
+        version = "0.5.0";
+        versionStr = "0.5.0";
     };
 };
 
@@ -24,9 +24,6 @@ class CfgFunctions
             class keyDown {};
             class keyUp {};
             class setThrottle {};
-            class startReverseLoop {};
-            class brakeHoldWatcher {};
-            class startBrakeLoop {};
             class adjustThrottle {};
             class onGetInMan {};
             class onGetOutMan {};
@@ -34,6 +31,10 @@ class CfgFunctions
             class onGetOutManEH {};
             class onKilledEH {};
             class updateHud {};
+            class onSettingsMenuLoad {};
+            class refreshSettingsMenu {};
+            class settingsMenuKeyDown {};
+            class bindingToText {};
         };
     };
 };
@@ -82,3 +83,4 @@ class CfgVehicles
 };
 
 #include "ui\RscTitles.hpp"
+#include "ui\SettingsMenu.hpp"

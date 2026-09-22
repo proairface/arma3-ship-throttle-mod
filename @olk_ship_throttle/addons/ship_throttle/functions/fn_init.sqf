@@ -23,9 +23,10 @@
  * command inside postInit's own semi-scheduled context (BI forums flag
  * this as capable of stalling mission load in some cases).
  *
- * There's no in-game "Configure Addons" rebind menu without CBA - see
- * fn_keyDown.sqf / README.md "Keybinds" for the hardcoded defaults and
- * how to change them.
+ * There's no CBA "Configure Addons" rebind menu, but this addon ships
+ * its own: Ctrl+Shift+T opens a settings dialog (fn_onSettingsMenuLoad.sqf)
+ * to rebind the throttle-step keys, persisted per-profile. See
+ * fn_keyDown.sqf / README.md "Keybinds".
  *
  * Arguments:
  * 0: "postInit" <STRING>
@@ -45,8 +46,8 @@
     };
 
     _display displayAddEventHandler ["KeyDown", {
-        params ["_display", "_key", "_shift"];
-        [_key, _shift] call olk_fnc_keyDown
+        params ["_display", "_key", "_shift", "_ctrl"];
+        [_key, _shift, _ctrl] call olk_fnc_keyDown
     }];
 
     _display displayAddEventHandler ["KeyUp", {

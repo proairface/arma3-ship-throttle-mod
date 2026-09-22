@@ -1,33 +1,27 @@
 # Ship Throttle
 
-An [Arma 3](https://arma3.com/) addon that replaces the default
-"hold W to accelerate" control scheme for `Ship`-class vehicles (boats,
-RHIBs, speedboats, etc.) with a **jet-style, set-and-hold throttle
-percentage**: tap W/S to step the throttle up or down, the boat
-accelerates/holds that speed on its own, and a HUD readout at the
-bottom-center of the screen shows the current throttle %.
+An [Arma 3](https://arma3.com/) addon that adds a **jet-style,
+set-and-hold throttle percentage** to `Ship`-class vehicles (boats,
+RHIBs, speedboats, etc.): a modifier-key combo steps the throttle up or
+down, the boat accelerates/holds that speed on its own via
+`setCruiseControl`, and a HUD readout at the bottom-center of the screen
+shows the current throttle %. Native W/S/A/D (accelerate, brake,
+reverse, steer) are untouched - this addon adds cruise-control-style
+throttle *on top of* normal driving, it doesn't replace it.
 
-**Zero dependencies** - no CBA_A3 required. (Earlier builds used CBA for
-keybinding/settings/events; that was dropped after a persistent "requires
-addon CBA_A3" error in testing that didn't resolve even with CBA_A3
-installed and enabled - rather than keep debugging someone else's addon
-setup, the mod now only relies on vanilla Arma 3 mechanisms. See
-[Design decisions](#design-decisions) for what replaced what, and the
-tradeoff this brings back: no in-game rebind menu.)
+**Zero dependencies** - no CBA_A3 required, and its own small in-game
+settings menu (Ctrl+Shift+T) replaces the need for CBA's "Configure
+Addons" screen for rebinding. See [Design decisions](#design-decisions)
+for the history of why (CBA gave persistent, unreproducible errors;
+fully hijacking W/S for throttle - tried in 0.3.0-0.4.1 - broke native
+braking and felt clunky even after patching around it).
 
-> ✅ **Status: confirmed working in a live game** (as of this writing) -
-> forward throttle steps via W/S and holds speed via `setCruiseControl`,
-> reverse works via a scripted velocity loop, the engine starts
-> automatically, and the HUD updates correctly. Getting here took
-> several real bugs found through actual in-game testing, not just
-> review - see [Known risks](#known-risks--unverified-assumptions) and
-> the [Changelog](CHANGELOG.md) for the full history, including two
-> confirmed-wrong assumptions from the original brief (negative
-> `setCruiseControl` speed does not reverse a ship; the engine doesn't
-> start itself). What's newest and least field-tested - the reverse
-> velocity loop's smoothness, and the forward/reverse transition - is
-> called out explicitly in [Known risks](#known-risks--unverified-assumptions);
-> go through the [Testing checklist](#testing-checklist) for those.
+> ✅ **Status: confirmed working in a live game** as of 0.4.x (engine
+> auto-start, forward cruise control, HUD). **0.5.0's changes - the
+> modifier-key scheme and the settings menu - are new and not yet
+> field-tested.** See [Known risks](#known-risks--unverified-assumptions)
+> and [Changelog](CHANGELOG.md) for the full history of what's been
+> found and fixed through real testing so far.
 
 ## Requirements
 
@@ -46,7 +40,7 @@ tradeoff this brings back: no in-game rebind menu.)
 
 ## Building
 
-This repo ships source only (`config.cpp` + `.sqf`), not a packed
+This repo ships source only (`config.cpp` + `.sqf`/`.hpp`), not a packed
 `.pbo` (build artifacts aren't committed - see `.gitignore`). A few ways
 to pack it:
 
@@ -73,251 +67,195 @@ and have it output `ship_throttle.pbo` into `@olk_ship_throttle/addons/`.
 
 ## Keybinds
 
-**W and S are fully repurposed into jet-style throttle steps while
-driving a Ship** - not a supplement to native accelerate/brake, a
-replacement. Native hold-to-accelerate/brake no longer works on a boat
-at all once this addon is active; tap W/S to step the set throttle %
-instead, exactly like the brief's jet-throttle reference. W/S behave
-completely normally everywhere else (on foot, cars, aircraft,
-menus/chat).
+| Action | Default | Rebindable? |
+|---|---|---|
+| Throttle +10% | Ctrl + W | Yes, in-game |
+| Throttle -10% | Ctrl + S | Yes, in-game |
+| Throttle +1% (fine) | Ctrl + Shift + W | Same binding as above, + Shift |
+| Throttle -1% (fine) | Ctrl + Shift + S | Same binding as above, + Shift |
+| **Open settings menu** | **Ctrl + Shift + T** | No (fixed - it's how you rebind everything else) |
 
-Without CBA there's no "Configure Addons" rebind menu, so the keys are
-**hardcoded** (in `functions/fn_keyDown.sqf`):
+Throttle keys only do anything while you're in the driver seat of a
+`Ship`, and only consume the keypress when they do - plain W/A/S/D
+always behave completely normally (native accelerate/brake/reverse/
+steer), in a Ship or anywhere else.
 
-| Action | Key |
-|---|---|
-| Throttle +10% | tap W |
-| Throttle -10% | tap S |
-| Throttle +1% | tap Shift + W |
-| Throttle -1% | tap Shift + S |
-| **Active brake** (continuous deceleration) | **hold S** past ~0.3s |
+**To rebind:** press Ctrl+Shift+T to open the settings dialog, press
+`1` or `2` to select "Increase Throttle" or "Decrease Throttle", then
+press whatever key (with or without Ctrl held) you want to use -
+whatever you press becomes the new binding immediately, saved to your
+Arma profile (`profileNamespace`/`saveProfileNamespace` - survives
+mod updates and reinstalls, no file editing needed). Esc cancels a
+capture in progress, or closes the menu.
 
-Tapping a key steps once (not once per frame) - see "W/S key-repeat
-debounce" below. Holding S specifically switches from stepping into
-continuous active braking - see "Hold S to brake" below.
-
-To use different keys: edit the `DIK_*` constants in
-`functions/fn_keyDown.sqf` and `fn_keyUp.sqf` (see
-[`dikCodes.h`](https://github.com/CBATeam/CBA_A3) or the BI wiki's DIK
-code table for the full list) and repack.
-
-Keys only do anything while you're in the driver seat of a `Ship`.
+The settings dialog is deliberately keyboard-only (no clickable
+buttons) - see [Design decisions](#design-decisions) for why.
 
 ## Design decisions
 
-Answers to the brief's open questions, and choices made while building:
+Answers to the brief's open questions, and choices made while building
+(see [Changelog](CHANGELOG.md) for the full blow-by-blow):
 
-- **CBA_A3 dependency**: initially accepted, then **removed**. A
-  from-Workshop CBA_A3 install, checked and active in the launcher,
-  still produced a persistent "Addon 'olk_ship_throttle' requires addon
-  'CBA_A3'" error that didn't resolve through the usual fixes (launch
-  method, duplicate-install check). Rather than keep chasing an
-  unreproducible environment issue, the addon was rebuilt on vanilla
-  Arma 3 mechanisms only - see the replacements below.
-- **Reverse handling**: **negative throttle** (-100% to 100%). Confirmed
-  in real testing that `setCruiseControl` does not reverse a ship with a
-  negative speed (this was the mod's single biggest unverified risk from
-  day one, flagged as far back as the original brief). Reverse is
-  instead driven by a scripted velocity loop
-  (`fn_startReverseLoop.sqf`) - see [Known risks](#known-risks--unverified-assumptions).
-  The originally-planned fallback ("release control, let native S
-  reverse") no longer makes sense either, since S is fully consumed by
-  `fn_keyDown.sqf` for throttle-down now, not available as a native
-  reverse input.
-- **Throttle step size**: 10% per tap, with Shift held for ±1% fine
-  control.
-- **Keys: W/S, not a dedicated key** (changed after real-world testing).
-  The first build used unbound-by-default dedicated keys (Numpad ±,
-  matching the brief's "don't hardcode over existing keys" instinct);
-  the actual ask turned out to be "make W/S work like a jet throttle."
-  `fn_keyDown.sqf`/`fn_keyUp.sqf` now fully consume W/S while driving a
-  Ship - native hold-to-accelerate/brake stops working entirely on
-  boats, replaced by discrete steps, same as a real jet/plane throttle.
-- **W/S key-repeat debounce**: `KeyDown` fires repeatedly while a key is
-  held (engine-level key-repeat, same as a text field), which would
-  otherwise spam +10%/frame instead of +10%/tap. `fn_keyDown.sqf` tracks
-  currently-held keys (cleared by `fn_keyUp.sqf` on release) so a held
-  key steps exactly once.
-- **Hold S to brake** (added after real-world feedback that losing
-  native S-as-brake, a direct consequence of the W/S hijack above, felt
-  bad - no fast way to slow down, just repeated -10% taps). A tap of S
-  still steps -10%/-1% as before; holding it past 0.3s
-  (`fn_brakeHoldWatcher.sqf`) switches into continuous active braking
-  (`fn_startBrakeLoop.sqf`) that directly damps the ship's velocity
-  every 0.15s, restoring the "hold to brake" muscle memory without a new
-  keybind. Deliberately *doesn't* drive this by repeatedly retargeting
-  `setCruiseControl` to lower speeds - that would just have cruise
-  control's own PID fight/mask the deceleration; see
-  `fn_startBrakeLoop.sqf` for why. This is the newest, least-tested
-  mechanism in the mod (see Known risks).
-- **HUD style**: structured-text overlay (`"<pct>% ⚙"` / `"REV <pct>%"`),
-  bottom-center, shown only while driving a `Ship`. Pure vanilla
-  `cutRsc`/`RscTitles` - never depended on CBA. Originally a small
-  bottom-right text box; redesigned after real-world feedback to be
-  larger and more legible, using `PuristaSemiBold` (Arma 3's own UI
+- **CBA_A3 dependency**: initially accepted, then **removed** after a
+  persistent, unreproducible "requires addon CBA_A3" error. The addon
+  is built entirely on vanilla Arma 3 mechanisms.
+- **Control scheme: Ctrl+W/Ctrl+S, not a hijacked W/S** (changed twice).
+  The brief's original idea was dedicated unbound keys; that became
+  "make W/S themselves work like a jet throttle" (0.3.0), fully
+  consuming W/S while driving a Ship - which broke native braking
+  entirely, patched around with a custom hold-to-brake mechanism
+  (0.4.1) that still felt clunky in real testing. 0.5.0 instead frees
+  W/S completely and moves throttle control to a Ctrl modifier combo,
+  so native accelerate/brake/reverse "just work" via the vehicle's own
+  well-tested physics, and the mod only ever *adds* forward cruise
+  control on top - closer to the original brief's own assumption that
+  "manually accelerating [above cruise control's set speed] is
+  possible... leaving W available as a manual boost is arguably fine
+  UX."
+- **Reverse: back to native S, not scripted.** 0.4.0 added negative
+  throttle with a custom scripted velocity loop, since
+  `setCruiseControl` doesn't support negative speeds (confirmed in
+  testing). Freeing native S in 0.5.0 made that whole mechanism
+  unnecessary - reversing is just native boat physics again, which is
+  simpler and better-tested than anything this addon could script.
+  Throttle is 0-100% only now.
+- **A real settings menu, not just hardcoded keys.** Since there's no
+  CBA "Configure Addons" screen, 0.5.0 adds a small in-game dialog
+  (Ctrl+Shift+T) instead. Considered a `userconfig`-folder/`.ini`-style
+  approach first, but that requires the player to launch with
+  `-filePatching` enabled (off by default since Arma 3 v1.50) for an
+  *addon* (as opposed to a mission) to read it at all - not something a
+  typical player would know to do. `profileNamespace` has no such
+  requirement and already persists other addon-local settings, so it's
+  the more robust choice for something meant to actually work for
+  players who aren't editing config files.
+- **Settings menu is keyboard-only, no clickable buttons.** Building it
+  with `CT_BUTTON` controls would need inheriting from the vanilla
+  `RscButton` base class (many required sub-properties - colors, sounds,
+  etc. - that aren't safe to guess), and the exact include path for
+  those BIS base classes outside a mission context wasn't something
+  this project could pin down with confidence. Given the `style`
+  required-field mistake earlier in this project's history (see
+  Changelog 0.3.4), guessing at a bigger, less-documented control type
+  without the ability to test visually felt like a worse bet than a
+  functionally complete keyboard-driven menu using only
+  `CT_STRUCTURED_TEXT` - the one control type already proven to work
+  correctly, for the HUD.
+- **Throttle step size**: 10% per tap, Shift for ±1% fine control -
+  unchanged since the original brief.
+- **HUD style**: structured-text overlay (`"<pct>% ⚙"`), bottom-center,
+  shown only while driving a `Ship`. Pure vanilla `cutRsc`/`RscTitles` -
+  never depended on CBA. Styled with `PuristaSemiBold` (Arma 3's own UI
   font, confirmed against a real community pilot-HUD mod's config
   rather than guessed) and a soft cyan-white tone closer to Arma's
-  vehicle-instrument look. Faithfully reproducing the actual vanilla
-  jet MFD's throttle gauge graphics (not just its general look) would
-  mean depending on jet-specific internal dialog resources this addon
-  has no reason to touch for a boat - if you want it closer to a
-  specific reference image, share it and the position/size/colors here
-  can be tuned further.
+  vehicle-instrument look, after an earlier, smaller/plainer version.
 - **Idle (0%) behavior**: fully **releases** cruise control
   (`setCruiseControl [0, false]`) rather than actively holding station at
-  0 speed (`setCruiseControl [0, true]`). At 0% the hull coasts/drifts
-  like a real idling boat, rather than fighting waves/current to stay
-  pinned in place. If that feels wrong in testing, swap the branch in
-  `functions/fn_setThrottle.sqf`.
+  0 speed. At 0% the hull coasts/drifts like a real idling boat, rather
+  than fighting waves/current to stay pinned in place.
 - **Vehicle-enter/exit detection**: vanilla config-level `GetInMan` /
   `GetOutMan` / `Killed` EventHandlers declared on `CAManBase` in
   `config.cpp` (fires for every unit; each dispatcher function in
   `functions/fn_on*EH.sqf` filters down to "this is the local player").
   These are genuine native Arma 3 unit EventHandlers, confirmed on the
   BI wiki (`GetOutMan`'s documented signature is
-  `[unit, role, vehicle, turret, isEject]`) - **not** CBA player events.
-  An earlier build used CBA's `"vehicle"` player event and, before that,
-  the brief's proposed `"GetInMan"`/`"GetOutMan"` as if they were CBA
-  event names; they aren't (CBA's real player-event list is `unit`,
-  `weapon`, `turretWeapon`, `muzzle`, `weaponMode`, `loadout`, `vehicle`,
-  `turret`, `featureCamera`, `cameraView`, `visionMode`, `visibleMap`,
-  `group`, `leader`) - the *vanilla* engine-level `GetInMan`/`GetOutMan`
-  EventHandlers the brief was actually thinking of are real, just not
-  reachable through CBA's player-event wrapper.
+  `[unit, role, vehicle, turret, isEject]`) - not CBA player events (an
+  earlier build's mistake - see Changelog).
 - **Init/keybind registration without CBA XEH**: a `CfgFunctions` entry
-  with `postInit = 1` (a vanilla mechanism, not CBA-specific) runs once
-  at mission start and registers a `displayAddEventHandler ["KeyDown", ...]`
+  with `postInit = 1` (vanilla, not CBA-specific) runs once at mission
+  start and registers a `displayAddEventHandler ["KeyDown", ...]`
   handler on `findDisplay 46` - the standard pre-CBA technique for a
-  global hotkey. It runs inside its own `spawn` scope rather than
-  directly in postInit, since postInit's environment is scheduled but
-  reportedly close to blocking (BI forums note a `waitUntil` placed
-  directly in postInit can stall mission loading in some cases) -
-  spawning first means postInit itself returns immediately either way.
+  global hotkey.
 - **Entry-detection watchdog (defense-in-depth)**: `fn_init.sqf` also
   spawns a 1s polling loop that starts throttle tracking the moment it
   finds the local player driving a Ship, independent of whether the
-  `getInMan` EventHandler fired. This exists because of a real bug this
-  project shipped once already (see the note below) - it means a similar
-  future mistake fails soft (control starts up to ~1s late) instead of
-  silently doing nothing.
+  `getInMan` EventHandler fired - insurance against a repeat of a real
+  bug this project shipped once already (see Changelog).
 
 ## Known risks / unverified assumptions
 
-Carried over from the original brief, plus what this build added:
+- ⚠️ **UNVERIFIED - the whole 0.5.0 rework.** Nothing about the
+  Ctrl-modifier scheme or the settings menu has been driven in a live
+  game yet. Specific things that could plausibly be wrong:
+  - Whether `displayAddEventHandler`'s `_ctrl` parameter behaves exactly
+    as assumed (mirrors the already-confirmed `_shift` parameter).
+  - Whether a bare top-level `class olk_ship_throttle_settings {...}`
+    (not nested under a `Dialogs` wrapper) is really enough for
+    `createDialog` to find it - the BI wiki says it searches `configFile`
+    by class name without mentioning a required wrapper, but this
+    hasn't been confirmed against a live game.
+  - Whether `enableSimulation = 1` and the dialog's general behavior
+    (does it pause anything? does Esc correctly close it without also
+    opening Arma's own pause menu underneath?) work as expected.
+  - Whether capturing a *shifted* key (e.g. binding "Increase Throttle"
+    to plain Shift+something) breaks the separate coarse/fine Shift
+    convention in a confusing way - not specifically handled, just not
+    expected to come up.
+  - Whether Ctrl+W/Ctrl+S collide with anything else bound by default
+    in vanilla Arma (not checked exhaustively).
 
-- ⚠️ **UNVERIFIED - the active-braking velocity damping.** Brand new
-  mechanism (`fn_startBrakeLoop.sqf`), not yet driven in-game. Untested:
-  whether a 0.85 decay factor every 0.15s feels right (too weak, too
-  sudden, or fine), whether directly setting velocity fights the hull's
-  own buoyancy/wave physics in a way that looks wrong, and the handoff
-  moment when S is released mid-brake and control passes back to
-  `fn_setThrottle.sqf`. Tune the decay factor/interval in
-  `fn_startBrakeLoop.sqf` to taste once tested. Also means holding S for
-  a while now walks *through* 0% into reverse rather than stopping at
-  idle - untested whether that transition feels smooth or jarring (see
-  testing checklist item 7, which already covered the tap-based version
-  of this transition).
+  Go through the [Testing checklist](#testing-checklist) below before
+  relying on this build.
 - 🐛 **FIXED - the engine didn't start itself.** Real testing showed
   throttle % climbing with no actual boat movement: `setCruiseControl`
   doesn't turn a ship's engine on by itself. Fixed with `engineOn true`
   in `fn_onGetInMan.sqf` (once, right when the player becomes driver)
   and again defensively in `fn_setThrottle.sqf` whenever throttle is
-  positive, in case something else turns the engine off mid-session.
-
+  positive.
 - 🐛 **FIXED - `CAManBase`'s re-declared parent class was wrong.**
   `config.cpp` re-opened `CAManBase` as `class CAManBase: Civilian`, but
   the real base game hierarchy has `CAManBase` inheriting from `Man`
-  directly (confirmed against a real working mod's config:
-  `class Man: Land {...}; class CAManBase: Man {...};` - no `Civilian`
-  in that chain at all). Reopening an existing class with a mismatched
-  parent is a real, documented Arma config problem. It's unclear how
-  much this actually broke in practice (the postInit watchdog fallback
-  may have been masking it), but it was wrong regardless and is now
-  fixed to inherit directly from `Man`, matching the confirmed
-  hierarchy.
-- 🐛 **FIXED (regression I introduced, then fixed) - `style` is a
-  required config entry.** A review pass removed the HUD control's
-  `style` property, reasoning it was an unverified/redundant guess
-  (`ST_RIGHT`) since alignment already comes from an inline
-  `<t align='right'>` tag. That was wrong: `style` turned out to be
-  *required* for this control (confirmed by an in-game
-  `No entry '...olk_throttle_text.style'` error the moment the HUD
-  tried to load) - the lesson being that an unverified *value* and a
-  missing *required field* are different problems, and removing a
-  field entirely is not a safe way to avoid an unverified guess.
+  directly (confirmed against a real working mod's config). Reopening an
+  existing class with a mismatched parent is a real, documented Arma
+  config problem. Fixed to inherit directly from `Man`.
+- 🐛 **FIXED (a regression, caught and fixed same day) - `style` is a
+  required config entry**, not just an alignment value. Removing it
+  entirely (thinking it was an unverified/redundant guess) broke the
+  HUD outright, confirmed by an in-game `No entry '...style'` error.
   Restored with `style = 0` (`ST_LEFT`, confirmed on the BI wiki as a
-  safe baseline) - actual right-alignment still comes from the inline
-  tag, independent of this value.
-- 🐛 **CONFIRMED BROKEN, then fixed - reverse via negative
-  `setCruiseControl` speed.** This was flagged as the mod's single
-  biggest unverified risk from the original brief onward: the BI wiki
-  only documents `setCruiseControl`'s speed parameter for positive km/h
-  values. Real testing confirmed it: a negative speed does not reverse
-  the ship. Replaced with a scripted velocity loop
-  (`fn_startReverseLoop.sqf`) that sets the ship's velocity opposite its
-  forward direction every 0.05s, scaled to `|throttle%| * maxSpeed`,
-  while preserving vertical velocity so wave bobbing isn't fought. This
-  is a different, cruder mechanism than forward throttle's
-  `setCruiseControl`-based PID hold - it doesn't correct for external
-  forces (waves, collisions, current) between ticks the way cruise
-  control does, so reverse may feel less "held" than forward. Untested:
-  how it behaves in choppier water, at the moment reverse starts from a
-  significant forward speed, and in multiplayer (velocity-setting is
-  typically local-only, same locality assumption as `setCruiseControl` -
-  see the MP risk below).
-- ⚠️ **NEW ASSUMPTION - the brake-detection watch loop only checks
-  positive throttle.** Since reverse now deliberately keeps cruise
-  control released (`autoThrust == false` the whole time it's active),
-  the existing "did the player brake?" check in `fn_onGetInMan.sqf`
-  would misfire during every reverse if it still ran for negative
-  throttle too - it's now scoped to `_pct > 0` only. Not yet confirmed
-  this doesn't have some other edge case (e.g. braking while cruising
-  forward, then immediately reversing in the same watch-loop tick).
-- 🐛 **FIXED (was a real bug, not just a risk) - config EventHandlers
-  need the exact literal event name.** The first zero-dependency build
-  registered `class EventHandlers { olk_ship_throttle_getInMan = "..."; }`
-  on `CAManBase`, thinking an addon-prefixed name kept it collision-safe
+  safe baseline) - the same lesson applied when building the new
+  settings menu (see Design decisions above).
+- 🐛 **CONFIRMED BROKEN, then simplified away - reverse via negative
+  `setCruiseControl` speed.** Flagged as the mod's single biggest
+  unverified risk from the original brief onward; real testing
+  confirmed a negative speed does not reverse a ship. 0.4.0 replaced it
+  with a scripted velocity loop; 0.5.0 removed that entirely in favor
+  of native S (see Design decisions) now that W/S are free again.
+- 🐛 **FIXED - config EventHandlers need the exact literal event
+  name.** An early build registered custom-prefixed property names on
+  `CAManBase`'s `EventHandlers`, thinking that kept them collision-safe
   the way CBA's XEH does. It doesn't: vanilla config EventHandlers
-  dispatch strictly by the literal recognized name (`getInMan`,
-  `getOutMan`, `killed`, ...) - an unrecognized property name is just an
-  inert config value, never fires, and produces no error. That's why the
-  mod loaded clean but did nothing at all. Fixed by using the literal
-  names. The real tradeoff this brings back: without XEH, only one
-  handler per event name is allowed per class - if you ever add another
-  non-CBA addon that also defines `getInMan`/`getOutMan`/`killed` on
-  `CAManBase`, whichever loads last silently wins.
+  dispatch strictly by the literal recognized name - an unrecognized
+  property name is inert and never fires, with no error. Fixed by using
+  the literal `getInMan`/`getOutMan`/`killed` names. The real tradeoff
+  this brings back: without XEH, only one handler per event name is
+  allowed per class - if you ever add another non-CBA addon that also
+  defines these on `CAManBase`, whichever loads last silently wins.
 - ⚠️ **ASSUMPTION - `GetInMan`'s argument order.** Assumed to mirror the
   BI wiki's documented `GetOutMan` order (`unit, role, vehicle, turret`)
   since `GetInMan` itself wasn't directly documented in what was
   reachable during research. `fn_onGetInManEH.sqf` only trusts `_unit`
   and `_vehicle` from this (verifying the driver seat directly via the
   `driver` command rather than the reported role string), and the
-  postInit watchdog above is an independent fallback in case this
-  argument order - or anything else about this specific handler - turns
-  out to be wrong. If the HUD still never appears, add a `diag_log` at
-  the top of `fn_onGetInManEH.sqf` to see what arguments actually
-  arrive.
+  postInit watchdog is an independent fallback in case this argument
+  order - or anything else about this specific handler - turns out to
+  be wrong.
 - ⚠️ **ASSUMPTION - `maxSpeed` as the 100% ceiling.** Throttle % maps to
   target speed via `(pct / 100) * maxSpeed` from the vehicle's
   `CfgVehicles` config. `maxSpeed` is a standard AI-driving attribute,
   not guaranteed to be an accurate top-speed ceiling for every
-  vanilla/modded boat. Test against at least two differently-sized boats
-  (checklist item 6).
-- ⚠️ **ASSUMPTION (now largely moot) - brake cancels cruise control on
-  boats.** The BI wiki states applying brakes disables Cruise Control,
-  but its only worked example is a car. The watch loop in
-  `fn_onGetInMan.sqf` resets the throttle to 0% if it detects
-  `getCruiseControl` silently went to `autoThrust = false` while a
-  nonzero throttle was still stored. Since S is now fully consumed by
-  `fn_keyDown.sqf` instead of reaching the vehicle as a native brake
-  input, the player can no longer trigger this path directly - the
-  check is kept as a defensive fallback for any other way cruise
-  control might get silently disabled (collision, damage, another mod).
+  vanilla/modded boat. Test against at least two differently-sized boats.
+- ⚠️ **ASSUMPTION - brake cancels cruise control on boats.** The BI wiki
+  states applying brakes disables Cruise Control, but its only worked
+  example is a car. The watch loop in `fn_onGetInMan.sqf` resets the
+  throttle to 0% if it detects `getCruiseControl` silently went to
+  `autoThrust = false` while a nonzero throttle was still stored. This
+  is relevant again in 0.5.0 now that native S (brake) works normally.
 - ⚠️ **UNTESTED - multiplayer locality.** `setCruiseControl` is
   documented as operating on the *local* player's vehicle, so this
   should be inherently per-client with no sync needed - but that's only
   confirmed by reading the docs, not by an actual dedicated-server +
-  2-client test (checklist item 7).
+  2-client test.
 - Boat runs aground / collides: the throttle value persists as
   "commanded" even though actual speed drops - this mirrors real
   throttle behavior and is intentional, not a bug.
@@ -325,43 +263,45 @@ Carried over from the original brief, plus what this build added:
 ## Testing checklist
 
 1. Enter a vanilla RHIB as driver; confirm the throttle HUD appears at
-   0% and the engine is audibly/visibly running (confirms the
-   `engineOn` fix and the `GetInMan` assumption both hold).
-2. Tap W a few times to increase throttle; confirm the boat accelerates
-   on its own without holding W, and roughly holds a mid-range speed at
-   ~50%.
-3. Increase to 100%; compare against the boat's known/observed top speed
-   to sanity-check the `maxSpeed` assumption.
-4. Tap S past 0% into reverse; confirm the boat actually backs up
-   smoothly (not jerky/stuttering - the 0.05s velocity-loop interval was
-   chosen to feel smooth but hasn't been visually confirmed). Then tap W
-   back past 0% into forward again; confirm cruise control correctly
-   takes back over (no leftover reverse velocity/stuck state).
-5. Exit the vehicle mid-throttle (either direction), re-enter as driver;
-   confirm it comes back in a clean 0% state rather than resuming the
-   old value, and that the engine starts again.
-6. Switch from driver to a gunner/cargo seat *without* exiting the
-   vehicle; confirm the HUD hides and cruise control/reverse releases
-   (should be immediate via `GetOutMan`, or within ~0.5s via the watch
-   loop as a fallback).
-7. While cruising forward, decelerate straight through 0% into reverse
-   in one continuous series of S taps; confirm there's no stuck/confused
-   state at the transition.
-8. **Accelerate to a decent speed, then hold S** (don't tap - hold past
-   ~0.3s); confirm it switches into active braking and the boat visibly
-   slows down quickly, not just via repeated -10% taps. Release S
-   partway through; confirm it resumes normal forward/idle/reverse
-   handling cleanly from wherever it landed, with no stuck state. Then
-   try holding S long enough to pass through 0% into reverse - confirm
-   that handoff is also clean. This is the newest, least-tested code
-   path in the mod.
-9. Repeat steps 1-4 on a second, differently-sized boat class to catch
-   per-class `maxSpeed` weirdness.
-10. Basic MP test (2 clients, ideally a dedicated server) to confirm no
-   desync/host-authority issues - both `setCruiseControl` and
-   `setVelocity` are typically local-only commands, so this should be
-   per-client with no sync needed, but that's not yet confirmed for the
-   new reverse loop specifically.
+   0% and the engine is audibly/visibly running.
+2. Hold Ctrl and tap W a few times; confirm throttle increases in the
+   HUD and the boat accelerates on its own without holding W, roughly
+   holding a mid-range speed at ~50%. Confirm plain W (no Ctrl) still
+   works as normal native acceleration too, on top of whatever cruise
+   control is doing.
+3. Increase to 100% (Ctrl+W); compare against the boat's known/observed
+   top speed to sanity-check the `maxSpeed` assumption.
+4. **With cruise control holding a forward speed, tap plain S (no
+   Ctrl)** - confirm this behaves like normal braking (not a throttle
+   step) and doesn't get immediately overridden back to speed by cruise
+   control. This exercises the "brake cancels cruise control" assumption
+   for the first time since 0.3.0.
+5. Hold Ctrl and tap S a few times to decrease throttle to 0%; confirm
+   it stops adding forward cruise control and the boat coasts down
+   normally (no reverse - throttle floors at 0% now).
+6. Test plain S alone (no Ctrl) for reverse - confirm native boat
+   reverse works normally, since nothing should be intercepting it
+   anymore.
+7. Exit the vehicle mid-throttle, re-enter as driver; confirm it comes
+   back in a clean 0% state, and that the engine starts again.
+8. Switch from driver to a gunner/cargo seat *without* exiting the
+   vehicle; confirm the HUD hides and cruise control releases (should be
+   immediate via `GetOutMan`, or within ~0.5s via the watch loop as a
+   fallback).
+9. **Press Ctrl+Shift+T; confirm the settings menu opens** and shows the
+   current Increase/Decrease bindings. Press `1`, then press a different
+   key (e.g. plain `E`, no Ctrl); confirm the menu updates to show the
+   new binding, Esc closes the menu, and that key now actually controls
+   throttle in-game (while old Ctrl+W no longer does). Repeat for
+   Decrease. Test that Esc *during* a capture cancels without changing
+   the binding. Re-open the menu on a later mission/restart to confirm
+   the binding persisted via `profileNamespace`.
+10. Repeat steps 1-6 on a second, differently-sized boat class to catch
+    per-class `maxSpeed` weirdness.
+11. Basic MP test (2 clients, ideally a dedicated server) to confirm no
+    desync/host-authority issues - `setCruiseControl` is typically
+    local-only, so this should be per-client with no sync needed, but
+    that's not yet confirmed live.
 
 ## Repository layout
 
@@ -371,24 +311,26 @@ Carried over from the original brief, plus what this build added:
 └── addons/
     └── ship_throttle/
         ├── $PBOPREFIX$
-        ├── config.cpp          - CfgFunctions, CAManBase EventHandlers, RscTitles include
+        ├── config.cpp          - CfgFunctions, CAManBase EventHandlers, RscTitles/SettingsMenu includes
         ├── functions/
-        │   ├── fn_init.sqf            - postInit=1, registers KeyDown/KeyUp handlers
-        │   ├── fn_keyDown.sqf         - W/S hijack -> adjustThrottle; S also starts a brake-hold watcher
-        │   ├── fn_keyUp.sqf           - clears debounce; applies a deferred S tap, or stops braking
-        │   ├── fn_brakeHoldWatcher.sqf - 0.3s hold-vs-tap detector for S
-        │   ├── fn_startBrakeLoop.sqf  - continuous active braking (velocity damping) while S is held
-        │   ├── fn_setThrottle.sqf     - forward/idle via setCruiseControl, reverse via startReverseLoop
-        │   ├── fn_startReverseLoop.sqf - scripted velocity-based reverse (setCruiseControl doesn't reverse)
-        │   ├── fn_adjustThrottle.sqf  - +/- delta from a keypress
-        │   ├── fn_onGetInManEH.sqf    - GetInMan EH dispatcher (filters to local player)
-        │   ├── fn_onGetOutManEH.sqf   - GetOutMan EH dispatcher
-        │   ├── fn_onKilledEH.sqf      - Killed EH dispatcher
-        │   ├── fn_onGetInMan.sqf      - init state, show HUD, start watch loop
-        │   ├── fn_onGetOutMan.sqf     - release control, hide HUD
-        │   └── fn_updateHud.sqf       - repaint the HUD text
+        │   ├── fn_init.sqf              - postInit=1, registers KeyDown/KeyUp handlers
+        │   ├── fn_keyDown.sqf           - Ctrl+Shift+T opens settings; configurable Ctrl+W/Ctrl+S -> adjustThrottle
+        │   ├── fn_keyUp.sqf             - clears the key-repeat debounce tracker
+        │   ├── fn_setThrottle.sqf       - drives setCruiseControl, 0-100% only
+        │   ├── fn_adjustThrottle.sqf    - +/- delta from a keypress
+        │   ├── fn_onGetInManEH.sqf      - GetInMan EH dispatcher (filters to local player)
+        │   ├── fn_onGetOutManEH.sqf     - GetOutMan EH dispatcher
+        │   ├── fn_onKilledEH.sqf        - Killed EH dispatcher
+        │   ├── fn_onGetInMan.sqf        - init state, show HUD, start watch loop
+        │   ├── fn_onGetOutMan.sqf       - release control, hide HUD
+        │   ├── fn_updateHud.sqf         - repaint the HUD text
+        │   ├── fn_onSettingsMenuLoad.sqf   - settings dialog onLoad entry point
+        │   ├── fn_refreshSettingsMenu.sqf  - repaints the settings dialog's text
+        │   ├── fn_settingsMenuKeyDown.sqf  - settings dialog interaction/key-capture logic
+        │   └── fn_bindingToText.sqf        - DIK code -> human-readable key name
         └── ui/
-            └── RscTitles.hpp   - the HUD dialog resource
+            ├── RscTitles.hpp     - the HUD dialog resource
+            └── SettingsMenu.hpp  - the settings dialog resource
 ```
 
 ## Non-goals

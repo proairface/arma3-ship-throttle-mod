@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.5.0 - Ctrl+W/Ctrl+S modifier scheme, native reverse/brake restored, in-game settings menu
+
+Real-world feedback on 0.4.1: still clunky. Brainstormed with the user;
+concluded the real fix was freeing native W/S entirely rather than
+patching around the hijack again, plus giving the addon its own
+settings UI since CBA is off the table.
+
+- **Control scheme**: throttle stepping moved from bare W/S to
+  Ctrl+W/Ctrl+S (Shift for fine). Plain W/A/S/D are completely native
+  again - accelerate, brake, reverse, steer all work exactly like any
+  other vehicle. The addon now only ever adds forward cruise control on
+  top of normal driving, closer to the original brief's own assumption
+  ("leaving W available as a manual boost is arguably fine UX").
+- **Reverse simplified**: removed the 0.4.0 scripted velocity-based
+  reverse loop (`fn_startReverseLoop.sqf`) entirely. Now that native S
+  works again, reversing is just native boat physics - simpler and
+  better-tested than anything this addon could script. Throttle range
+  is 0-100% only now (was -100 to 100%).
+- **Hold-to-brake removed**: removed 0.4.1's custom active-braking
+  mechanism (`fn_brakeHoldWatcher.sqf`, `fn_startBrakeLoop.sqf`)
+  entirely - native S braking replaces it outright, and does so via the
+  vehicle's own well-tested physics instead of a hand-rolled velocity
+  damping loop.
+- **New: in-game settings menu** (Ctrl+Shift+T, new
+  `ui/SettingsMenu.hpp` + `fn_onSettingsMenuLoad.sqf`/
+  `fn_refreshSettingsMenu.sqf`/`fn_settingsMenuKeyDown.sqf`/
+  `fn_bindingToText.sqf`) to rebind the throttle keys without editing
+  files or repacking, saved to `profileNamespace`. Considered a
+  `userconfig`-folder/`.ini` approach first; ruled it out because Arma
+  only reads userconfig files into an *addon's* config when the player
+  launches with `-filePatching` enabled (off by default since v1.50) -
+  not something a typical player would opt into. Built keyboard-only
+  (no `CT_BUTTON`) rather than risk guessing at `RscButton`'s many
+  required sub-properties without the ability to test visually - same
+  lesson as the `style` mistake below, applied proactively this time.
+- The watch loop's brake-detection check (BI wiki: "applying brakes
+  disables Cruise Control") is relevant again now that native S works -
+  it had become moot while S was fully hijacked (0.3.0-0.4.1).
+- Not yet driven in a live game - see README "Known risks" and the
+  testing checklist for what to check first.
+
 ## 0.4.1 - hold S to brake
 
 Feedback after 0.4.0: losing native S-as-brake (a consequence of the

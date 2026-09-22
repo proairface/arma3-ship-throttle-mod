@@ -8,14 +8,14 @@
  * the vanilla equivalent of a per-frame handler) that:
  *  - detects the player leaving the driver seat (seat change, exiting,
  *    death) and hands off to fnc_onGetOutMan;
- *  - detects cruise control silently getting cancelled some other way
- *    while throttle is positive, and resets the stored throttle to 0
- *    so the HUD doesn't show a stale value. Only checked for *positive*
- *    throttle and only while *not* actively braking - during reverse
- *    (fn_startReverseLoop.sqf) and active braking
- *    (fn_startBrakeLoop.sqf), cruise control is deliberately
- *    released/off, so autoThrust==false is expected there, not an
- *    unexpected cancellation.
+ *  - detects the vehicle's native brake/S input silently cancelling
+ *    cruise control, and resets the stored throttle to 0 so the HUD
+ *    doesn't show a stale value (BI wiki: "applying brakes disables
+ *    Cruise Control" - ASSUMPTION, not confirmed for boats
+ *    specifically). Relevant again now that plain S is native
+ *    accelerate/brake/reverse (see fn_keyDown.sqf) rather than a
+ *    throttle-step key - tapping the brake while cruise control holds a
+ *    forward speed is an expected, everyday action.
  *
  * The watch loop only *reads* getCruiseControl - it never calls
  * setCruiseControl on a timer, since that would repeatedly reset the
@@ -52,7 +52,7 @@ _ship engineOn true;
         !isNull _ship && {alive _ship} && {vehicle player == _ship} && {driver _ship == player}
     } do {
         private _pct = _ship getVariable ["olk_throttlePct", 0];
-        if (_pct > 0 && {!(_ship getVariable ["olk_braking", false])}) then {
+        if (_pct > 0) then {
             (getCruiseControl _ship) params ["", "_autoThrust"];
             if (!_autoThrust) then {
                 [_ship, 0] call olk_fnc_setThrottle;

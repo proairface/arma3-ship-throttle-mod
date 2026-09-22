@@ -25,10 +25,8 @@ if (isNull _display) exitWith {};
 private _ctrl = _display displayCtrl 62100;
 if (isNull _ctrl) exitWith {};
 
-private _label = if (_pct < 0) then {
-    format ["<t align='center'>REV %1%%</t>", round abs _pct]
-} else {
-    format ["<t align='center'>%1%% ⚙</t>", round _pct]
-};
+// 0-100 only - see fn_setThrottle.sqf for why there's no negative/reverse
+// throttle anymore.
+private _label = format ["<t align='center'>%1%% ⚙</t>", round _pct];
 
 _ctrl ctrlSetStructuredText parseText _label;
